@@ -1,5 +1,4 @@
-@import './reset.css';
-@import './variables.css';
+@import "tailwindcss";
 
 * {
   box-sizing: border-box;
@@ -13,12 +12,4 @@ body,
 
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background: var(--color-bg);
-  color: var(--color-text);
-}
-
-button {
-  font: inherit;
-  cursor: pointer;
 }

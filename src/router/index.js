@@ -1,13 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import ProductPage from '../views/ProductPage.vue'
+import LandingPage from '../views/LandingPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      name: 'product',
-      component: ProductPage,
+      name: 'Landing',
+      component: LandingPage,
     },
   ],
 })

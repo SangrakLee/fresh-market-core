@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.2",
+    "@tailwindcss/vite": "^4.2.2",
     "axios": "^1.13.6",
+    "tailwindcss": "^4.2.2",
     "vue": "^3.5.29",
     "vue-router": "^5.0.3"
   },
