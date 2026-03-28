@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang&display=swap');
 @import "tailwindcss";
 
 * {
@@ -12,4 +13,8 @@ body,
 
 body {
   margin: 0;
+}
+
+.font-gowunbatang {
+  font-family: "Gowun Batang", serif;
 }
