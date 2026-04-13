@@ -1,5 +1,6 @@
 <template>
   <router-view />
+  <FloatingNoticeBar />
   <BottomNavBar :session="session" />
 </template>
 
@@ -7,6 +8,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterView } from 'vue-router'
 import { supabase } from '@/lib/supabase'
+import FloatingNoticeBar from '@/components/notifications/FloatingNoticeBar.vue'
 import BottomNavBar from '@/components/navigation/BottomNavBar.vue'
 
 const session = ref(null)

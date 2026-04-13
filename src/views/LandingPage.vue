@@ -1,46 +1,4 @@
 <template>
-  <!-- 로그인 상태 UI -->
-  <!-- <section class="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-    <template v-if="session">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <div class="text-sm font-bold text-gray-900">로그인됨</div>
-          <div class="text-sm text-gray-500">{{ authUserLabel }}</div>
-        </div>
-        <div class="flex gap-2">
-          <button
-            class="rounded-xl border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 transition hover:bg-gray-50"
-            @click="openOrderHistory"
-          >
-            주문내역
-          </button>
-          <button
-            class="rounded-xl border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 transition hover:bg-gray-50"
-            @click="signOut"
-          >
-            로그아웃
-          </button>
-        </div>
-      </div>
-    </template>
-
-    <template v-else>
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <div class="text-sm font-bold text-gray-900">비회원 상태</div>
-          <div class="text-sm text-gray-500">로그인하면 주문내역을 쉽게 볼 수 있어요</div>
-        </div>
-
-        <button
-          class="rounded-xl bg-yellow-400 px-3 py-2 text-sm font-semibold text-gray-900 transition hover:bg-yellow-300"
-          @click="signInWithKakao"
-        >
-          카카오 로그인
-        </button>
-      </div>
-    </template>
-  </section> -->
-  <!-- 로그인 상태 UI 끝-->
   <section class="relative min-h-screen overflow-hidden">
     <div class="absolute inset-0">
       <img :src="bgImg" class="w-full h-full object-cover" />
@@ -67,7 +25,7 @@
             정품 시세로 정품만 선별 판매하는 1등급 참외입니다.
           </p>
         </div>
-        <div class="absolute bottom-6 left-0 w-full px-6 md:px-12">
+        <!-- <div class="absolute bottom-6 left-0 w-full px-6 md:px-12">
           <div
             class="mx-auto max-w-md rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-lg shadow-lg"
           >
@@ -84,7 +42,7 @@
               </button>
             </div>
           </div>
-        </div>
+        </div> -->
         <BaseFullOverlay v-model="isBuyOpen">
           <BuyOverlayContent
             v-if="product"

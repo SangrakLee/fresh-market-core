@@ -59,27 +59,27 @@ const handleMove = (menu) => {
 
 <template>
   <nav
-    class="fixed bottom-0 left-0 right-0 z-50 border-t border-black/10 bg-white"
+    class="fixed bottom-0 left-0 right-0 z-50 border-t border-black/5 bg-white"
     style="padding-bottom: env(safe-area-inset-bottom)"
   >
-    <div class="mx-auto grid h-[74px] max-w-[430px] grid-cols-5">
+    <div class="mx-auto grid h-[60px] max-w-[430px] grid-cols-5">
       <button
         v-for="menu in menus"
         :key="menu.key"
         type="button"
-        class="flex flex-col items-center justify-center gap-[3px]"
+        class="flex flex-col items-center justify-center gap-[1px]"
         @click="handleMove(menu)"
       >
         <component
           :is="menu.icon"
-          class="h-6 w-6 transition-all duration-200"
-          :class="isActive(menu.path) ? 'text-black' : 'text-black/40'"
-          :stroke-width="isActive(menu.path) ? 2.4 : 2"
+          class="h-5 w-5 transition-all duration-200"
+          :class="isActive(menu.path) ? 'text-black' : 'text-black/35'"
+          :stroke-width="isActive(menu.path) ? 2.3 : 2"
         />
 
         <span
-          class="text-[11px] leading-none transition-all duration-200"
-          :class="isActive(menu.path) ? 'font-bold text-black' : 'font-medium text-black/40'"
+          class="text-[10px] leading-none transition-all duration-200"
+          :class="isActive(menu.path) ? 'font-bold text-black' : 'font-medium text-black/35'"
         >
           {{ menu.label }}
         </span>
