@@ -134,7 +134,6 @@ function handleSubmitOrder() {
     quantity: quantity.value,
     total_amount: totalPrice.value,
   }
-  console.log('orderPayload:', orderPayload)
   emit('submit-order', orderPayload)
 }
 </script>
