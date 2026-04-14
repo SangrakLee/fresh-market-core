@@ -48,11 +48,6 @@ onMounted(async () => {
 <template>
   <div class="min-h-screen bg-white px-6 pt-8 pb-24">
     <div class="mx-auto max-w-[430px]">
-      <div class="mb-6">
-        <p class="mb-1 text-xs text-black/40">고마마정품</p>
-        <h1 class="text-2xl font-bold text-black">마이고정</h1>
-      </div>
-
       <template v-if="session">
         <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
           <div class="text-sm font-bold text-gray-900">로그인됨</div>

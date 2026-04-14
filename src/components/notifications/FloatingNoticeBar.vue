@@ -13,11 +13,11 @@ const closeBanner = () => {
   <transition name="notice-fade">
     <div
       v-if="isVisible"
-      class="fixed bottom-[60px] left-0 right-0 z-40 px-3"
+      class="fixed bottom-[70px] left-0 right-0 z-40 px-3"
       style="padding-bottom: env(safe-area-inset-bottom)"
     >
       <div
-        class="mx-auto flex h-[58px] max-w-[430px] items-center justify-between rounded-[18px] border border-[#18d7df]/40 bg-[#051737] px-3 shadow-[0_10px_28px_rgba(0,0,0,0.28)]"
+        class="mx-auto flex h-[58px] max-w-[430px] items-center justify-between rounded-[10px] border border-[#18d7df]/80 bg-[#051737] px-3 shadow-[0_10px_28px_rgba(0,0,0,0.28)]"
       >
         <!-- 왼쪽 라벨 -->
         <div class="mr-3 flex h-[32px] shrink-0 items-center rounded-[8px] bg-[#00d7de] px-3">

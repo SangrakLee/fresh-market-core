@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import PageHeader from '@/components/common/PageHeader.vue'
 import { supabase } from '@/lib/supabase'
 
 const router = useRouter()
@@ -101,13 +102,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-white px-6 pt-8 pb-24">
+  <div class="min-h-screen bg-white px-6 pt-3 pb-24">
     <div class="mx-auto max-w-[430px]">
-      <div class="mb-6">
-        <p class="mb-1 text-xs text-black/40">고마마정품</p>
-        <h1 class="text-2xl font-bold text-black">주문내역</h1>
-      </div>
-
       <template v-if="!session">
         <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
           <div class="text-sm font-bold text-gray-900">비회원 상태</div>
@@ -137,7 +133,7 @@ onMounted(async () => {
         </div>
 
         <div v-else class="space-y-6">
-          <!-- 이번에 추가: 최근 주문 -->
+          <!-- 최근 주문 -->
           <div v-if="recentOrder">
             <p class="mb-2 text-sm font-semibold text-black">최근 주문</p>
 

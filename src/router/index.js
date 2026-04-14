@@ -35,21 +35,37 @@ const router = createRouter({
       path: '/shopping',
       name: 'shopping',
       component: ShoppingPage,
+      meta: {
+        title: '쇼핑장보기',
+        description: '쇼핑장보기 메뉴는 곧 연결될 예정입니다',
+      },
     },
     {
       path: '/group-buy',
       name: 'group-buy',
       component: GroupBuyPage,
+      meta: {
+        title: '공동구매',
+        description: '공동구매 메뉴는 곧 연결될 예정입니다',
+      },
     },
     {
       path: '/orders',
       name: 'orders',
       component: OrdersPage,
+      meta: {
+        title: '주문내역',
+        description: '최근 주문을 확인하고 빠르게 재구매 할 수 있어요',
+      },
     },
     {
       path: '/mypage',
       name: 'mypage',
       component: MyPage,
+      meta: {
+        title: '마이고정',
+        description: '고마마정품 회원이신 고정고객님께 할인 혜택을 드려요',
+      },
     },
   ],
 })

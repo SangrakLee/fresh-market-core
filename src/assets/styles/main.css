@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&family=Gowun+Batang&display=swap');
 @import "tailwindcss";
 
 * {
@@ -17,4 +17,8 @@ body {
 
 .font-gowunbatang {
   font-family: "Gowun Batang", serif;
+}
+
+.font-east-sea-dokdo {
+  font-family: "East Sea Dokdo", serif;
 }
