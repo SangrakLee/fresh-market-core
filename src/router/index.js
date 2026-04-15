@@ -7,6 +7,7 @@ import ShoppingPage from '@/views/ShoppingPage.vue'
 import GroupBuyPage from '@/views/GroupBuyPage.vue'
 import OrdersPage from '@/views/OrdersPage.vue'
 import MyPage from '@/views/MyPage.vue'
+import { useSplashLoading } from '@/stores/splashLoading'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -69,5 +70,19 @@ const router = createRouter({
     },
   ],
 })
+
+const { startSplashLoading, stopSplashLoading } = useSplashLoading()
+
+router.beforeEach((to, from, next) => {
+  if (to.fullPath !== from.fullPath) {
+    startSplashLoading()
+  }
+  next()
+})
+
+router.afterEach(() => {
+  stopSplashLoading({ minDuration: 450 })
+})
+
 
 export default router

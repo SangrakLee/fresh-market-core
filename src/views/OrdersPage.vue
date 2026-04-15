@@ -1,8 +1,9 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import PageHeader from '@/components/common/PageHeader.vue'
 import { supabase } from '@/lib/supabase'
+// import BrandSplashLoading from '@/components/common/BrandSplashLoading.vue'
+import { useSplashLoading } from '@/stores/splashLoading'
 
 const router = useRouter()
 
@@ -10,6 +11,8 @@ const session = ref(null)
 const authUserLabel = ref('')
 const orderHistoryList = ref([])
 const isLoadingOrderHistory = ref(false)
+// const isReorderLoading = ref(false)
+const { withSplashLoading } = useSplashLoading()
 
 const recentOrder = computed(() => orderHistoryList.value[0] || null)
 const otherOrders = computed(() => orderHistoryList.value.slice(1))
@@ -48,30 +51,56 @@ const fetchMyOrders = async () => {
   isLoadingOrderHistory.value = false
 }
 
-const handleReorder = (order) => {
-  router.push({
-    path: '/',
-    query: {
-      reorder: '1',
-      product_id: order.product_id,
-      product_name: order.product_name,
-      option_id: order.option_id,
-      option_name: order.option_name,
-      quantity: order.quantity,
-      total_amount: order.total_amount,
-      recipient_name: order.recipient_name || '',
-      recipient_phone: order.recipient_phone || '',
-      recipient_address: order.recipient_address || '',
-      recipient_zonecode: order.recipient_zonecode || '',
-      recipient_base_address: order.recipient_base_address || '',
-      recipient_detail_address: order.recipient_detail_address || '',
-      delivery_message: order.delivery_message || '',
+// const handleReorder = (order) => {
+//   router.push({
+//     path: '/',
+//     query: {
+//       reorder: '1',
+//       product_id: order.product_id,
+//       product_name: order.product_name,
+//       option_id: order.option_id,
+//       option_name: order.option_name,
+//       quantity: order.quantity,
+//       total_amount: order.total_amount,
+//       recipient_name: order.recipient_name || '',
+//       recipient_phone: order.recipient_phone || '',
+//       recipient_address: order.recipient_address || '',
+//       recipient_zonecode: order.recipient_zonecode || '',
+//       recipient_base_address: order.recipient_base_address || '',
+//       recipient_detail_address: order.recipient_detail_address || '',
+//       delivery_message: order.delivery_message || '',
+//     },
+//   })
+// }
+
+const handleReorder = async (order) => {
+  await withSplashLoading(
+    async () => {
+      await router.push({
+        path: '/',
+        query: {
+          reorder: '1',
+          product_id: order.product_id,
+          product_name: order.product_name,
+          option_id: order.option_id,
+          option_name: order.option_name,
+          quantity: order.quantity,
+          total_amount: order.total_amount,
+          recipient_name: order.recipient_name || '',
+          recipient_phone: order.recipient_phone || '',
+          recipient_address: order.recipient_address || '',
+          recipient_zonecode: order.recipient_zonecode || '',
+          recipient_base_address: order.recipient_base_address || '',
+          recipient_detail_address: order.recipient_detail_address || '',
+          delivery_message: order.delivery_message || '',
+        },
+      })
     },
-  })
+    { minDuration: 900 },
+  )
 }
 
 const formatStatus = (status) => {
-  // 이번에 추가
   if (status === 'paid') return '결제완료'
   if (status === 'pending') return '결제대기'
   if (status === 'failed') return '결제실패'
@@ -80,7 +109,6 @@ const formatStatus = (status) => {
 }
 
 const statusClass = (status) => {
-  // 이번에 추가
   if (status === 'paid') return 'bg-emerald-50 text-emerald-600'
   if (status === 'pending') return 'bg-amber-50 text-amber-600'
   if (status === 'failed') return 'bg-red-50 text-red-600'
