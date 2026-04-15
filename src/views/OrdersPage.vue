@@ -21,8 +21,7 @@ const { withSplashLoading } = useSplashLoading()
 
 // const recentOrder = computed(() => orderHistoryList.value[0] || null)
 // const otherOrders = computed(() => orderHistoryList.value.slice(1))
-const recentReorderOrders = computed(() => orderHistoryList.value.slice(0, 10))
-const otherOrders = computed(() => orderHistoryList.value.slice(10))
+const recentReorderOrders = computed(() => orderHistoryList.value)
 
 const signInWithKakao = async () => {
   const { error } = await supabase.auth.signInWithOAuth({
@@ -203,7 +202,7 @@ onMounted(async () => {
           아직 주문내역이 없습니다.
         </div>
 
-        <div v-else class="space-y-6">
+        <div v-else>
           <!-- 최근 주문 다시하기: 가로 드래그 + 부분 로딩 -->
           <div v-if="recentReorderOrders.length">
             <div class="mb-2 flex items-center justify-between">
@@ -213,7 +212,7 @@ onMounted(async () => {
 
             <div
               ref="reorderScrollRef"
-              class="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
+              class="flex flex-nowrap snap-x snap-mandatory gap-3 overflow-x-auto pb-2 overscroll-x-contain"
               @scroll="handleRecentReorderScroll"
             >
               <div
@@ -248,54 +247,12 @@ onMounted(async () => {
                   다시 주문하기
                 </button>
               </div>
-            </div>
-            <div v-if="isLoadingMoreOrders" class="mt-2 text-center text-xs text-black/45">
-              주문내역 더 불러오는 중...
-            </div>
-          </div>
 
-          <!-- 나머지 주문 목록 -->
-          <div v-if="otherOrders.length" class="space-y-4">
-            <p class="text-sm font-semibold text-black">이전 주문내역</p>
-
-            <div
-              v-for="order in otherOrders"
-              :key="order.id"
-              class="rounded-2xl border border-black/10 bg-white p-4"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <div class="text-sm font-semibold text-black">{{ order.product_name }}</div>
-                  <div class="mt-1 text-sm text-black/60">
-                    {{ order.option_name }} · {{ order.quantity }}개
-                  </div>
-                </div>
-
-                <span
-                  class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-                  :class="statusClass(order.order_status)"
-                >
-                  {{ formatStatus(order.order_status) }}
-                </span>
-              </div>
-
-              <div class="mt-4 space-y-1 text-sm text-black/70">
-                <p>받는 분: {{ order.recipient_name }}</p>
-                <p>연락처: {{ order.recipient_phone }}</p>
-                <p>주소: {{ order.recipient_address }}</p>
-              </div>
-
-              <div class="mt-4 flex items-center justify-between">
-                <div class="text-base font-semibold text-black">
-                  {{ Number(order.total_amount || 0).toLocaleString() }}원
-                </div>
-
-                <button
-                  class="rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white"
-                  @click="handleReorder(order)"
-                >
-                  재주문
-                </button>
+              <div
+                v-if="isLoadingMoreOrders"
+                class="flex h-[174px] w-[130px] shrink-0 snap-start items-center justify-center rounded-2xl border border-black/10 bg-black/[0.02] text-xs text-black/45"
+              >
+                불러오는 중...
               </div>
             </div>
           </div>
