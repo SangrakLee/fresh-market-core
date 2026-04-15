@@ -5,6 +5,10 @@
   <router-view />
   <FloatingNoticeBar />
   <BottomNavBar :session="session" />
+  <BrandSplashLoading
+    :visible="isSplashVisible"
+    description="고마마정품 화면을 불러오는 중이에요."
+  />
 </template>
 
 <script setup>
@@ -14,11 +18,15 @@ import { supabase } from '@/lib/supabase'
 import PageHeader from '@/components/common/PageHeader.vue'
 import FloatingNoticeBar from '@/components/notifications/FloatingNoticeBar.vue'
 import BottomNavBar from '@/components/navigation/BottomNavBar.vue'
+import BrandSplashLoading from '@/components/common/BrandSplashLoading.vue'
+import { useSplashLoading } from '@/stores/splashLoading'
 
 const route = useRoute()
 
 const session = ref(null)
 let authSubscription = null
+
+const { isSplashVisible } = useSplashLoading()
 
 const pageTitle = computed(() => route.meta.title || '')
 const pageDescription = computed(() => route.meta.description || '')

@@ -73,16 +73,15 @@ const router = createRouter({
 
 const { startSplashLoading, stopSplashLoading } = useSplashLoading()
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, from) => {
   if (to.fullPath !== from.fullPath) {
     startSplashLoading()
   }
-  next()
+  return true
 })
 
 router.afterEach(() => {
   stopSplashLoading({ minDuration: 450 })
 })
-
 
 export default router
