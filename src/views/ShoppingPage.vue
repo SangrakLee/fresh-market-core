@@ -1,8 +1,7 @@
 <script setup>
-const baseUrl = import.meta.env.BASE_URL
 const detailImagePaths = [
-  '${baseUrl}assets/detail-img/260418-detail-01.jpg',
-  '${baseUrl}assets/detail-img/260418-detail-02.jpg',
+  '/assets/images/detail-img/260418-detail-01.jpg',
+  '/assets/images/detail-img/260418-detail-02.jpg',
 ]
 </script>
 
