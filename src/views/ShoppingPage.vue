@@ -1,8 +1,10 @@
 <script setup>
-const detailImagePaths = [
-  '/assets/images/detail-img/260418-detail-01.jpg',
-  '/assets/images/detail-img/260418-detail-02.jpg',
-]
+const detailImageModules = import.meta.glob('../assets/images/detail-img/*.{jpg,jpeg,png,webp}', {
+  eager: true,
+  import: 'default',
+})
+
+const detailImagePaths = Object.values(detailImageModules).sort()
 </script>
 
 <template>
