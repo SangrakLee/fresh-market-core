@@ -2,7 +2,8 @@
   <div v-if="showHeader" class="mx-auto max-w-[430px] px-6 pt-8">
     <PageHeader :title="pageTitle" :description="pageDescription" />
   </div>
-  <router-view />
+  <RouterView />
+  <CommonFooter />
   <FloatingNoticeBar />
   <BottomNavBar :session="session" />
   <BrandSplashLoading
@@ -16,6 +17,7 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, RouterView } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import PageHeader from '@/components/common/PageHeader.vue'
+import CommonFooter from '@/components/common/CommonFooter.vue'
 import FloatingNoticeBar from '@/components/notifications/FloatingNoticeBar.vue'
 import BottomNavBar from '@/components/navigation/BottomNavBar.vue'
 import BrandSplashLoading from '@/components/common/BrandSplashLoading.vue'
