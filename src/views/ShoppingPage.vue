@@ -30,10 +30,10 @@ const activeProduct = computed(
 </script>
 
 <template>
-  <div class="min-h-screen bg-white px-4 pt-4 pb-24">
-    <div class="mx-auto flex max-w-[430px] flex-col gap-2">
-      <div class="rounded-xl bg-white px-2 py-2 shadow-sm">
-        <div class="flex items-center justify-start gap-1">
+  <div class="min-h-screen bg-white">
+    <div class="mx-auto flex max-w-[430px] flex-col">
+      <div class="bg-white px-2 shadow-sm">
+        <div class="flex items-center justify-start gap-2">
           <button
             v-for="product in products"
             :key="product.key"
@@ -65,7 +65,7 @@ const activeProduct = computed(
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-xl bg-white shadow-sm">
         <img
           v-if="activeProduct?.imagePath"
           :src="activeProduct.imagePath"
