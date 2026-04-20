@@ -8,7 +8,7 @@
 
     <div class="relative z-10 pb-24">
       <div class="relative z-10 flex min-h-screen items-top px-6 pt-20 md:px-12 md:pb-24">
-        <div class="max-w-md text-white">
+        <!-- <div class="max-w-md text-white">
           <p
             class="mb-4 text-xs tracking-[0.25em] text-white/70 uppercase font-gowunbatang font-bold"
           >
@@ -24,7 +24,7 @@
             '고마마정품'은 직접 농사를 지어, 성주 각 공판장의<br />
             정품 시세로 정품만 선별 판매하는 1등급 참외입니다.
           </p>
-        </div>
+        </div> -->
         <!-- <div class="absolute bottom-6 left-0 w-full px-6 md:px-12">
           <div
             class="mx-auto max-w-md rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-lg shadow-lg"
@@ -100,7 +100,7 @@
 import { onMounted, ref, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
-import bgImg from '@/assets/images/gomamaLanding260323.jpg'
+import bgImg from '@/assets/images/LandingPage-image-260420.jpg'
 import { ChevronRight } from 'lucide-vue-next'
 // import BaseBottomSheet from '@/components/overlays/BaseBottomSheet.vue'
 import BaseFullOverlay from '@/components/overlays/BaseFullOverlay.vue'
