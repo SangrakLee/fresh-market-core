@@ -1,6 +1,8 @@
 <script setup>
 import { Citrus } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { supabase } from '../lib/supabase'
 
 const detailImageModules = import.meta.glob('../assets/images/detail-img/*.{jpg,jpeg,png,webp}', {
   eager: true,
@@ -9,31 +11,19 @@ const detailImageModules = import.meta.glob('../assets/images/detail-img/*.{jpg,
 
 const detailImagePaths = Object.values(detailImageModules).sort()
 
-const weightOptions = [
-  { key: '4kg', label: '4kg', guestPrice: 40000, memberPrice: 38000 },
-  { key: '10kg', label: '10kg', guestPrice: 40000, memberPrice: 38000 },
-]
-
-const products = computed(() =>
-  weightOptions.map((option, index) => ({
-    ...option,
-    imagePath: detailImagePaths[index] ?? '',
-  })),
-)
-
-const activeTab = ref(weightOptions[0].key)
+const products = ref([])
+const isLoading = ref(false)
+const loadError = ref('')
+const activeTab = ref(null)
 const selectedWeights = ref([])
-
-const quantities = ref(
-  weightOptions.reduce((acc, option) => {
-    acc[option.key] = 1
-    return acc
-  }, {}),
-)
+const quantities = ref({})
 const isMember = ref(false)
+const productName = ref('참외')
+const router = useRouter()
 
 const activeProduct = computed(
-  () => products.value.find((product) => product.key === activeTab.value) ?? products.value[0],
+  () =>
+    products.value.find((product) => product.key === activeTab.value) ?? products.value[0] ?? null,
 )
 
 const formatPrice = (price) => new Intl.NumberFormat('ko-KR').format(price)
@@ -59,11 +49,97 @@ const decreaseQuantity = (key) => {
   const currentQuantity = quantities.value[key] ?? 1
   quantities.value[key] = Math.max(1, currentQuantity - 1)
 }
+
+const loadProductOptions = async () => {
+  isLoading.value = true
+  loadError.value = ''
+
+  try {
+    const { data: productData, error: productError } = await supabase
+      .from('products')
+      .select('id, name')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (productError) {
+      throw productError
+    }
+    productName.value = productData.name || '참외'
+
+    const { data: optionData, error: optionError } = await supabase
+      .from('product_options')
+      .select('id, name, price')
+      .eq('product_id', productData.id)
+      .order('id', { ascending: true })
+
+    if (optionError) {
+      throw optionError
+    }
+
+    products.value = (optionData || []).map((option, index) => ({
+      key: option.id,
+      label: option.name,
+      guestPrice: option.price,
+      memberPrice: Math.max(option.price - 2000, 0),
+      imagePath: detailImagePaths[index] ?? '',
+    }))
+
+    quantities.value = products.value.reduce((acc, option) => {
+      acc[option.key] = 1
+      return acc
+    }, {})
+
+    selectedWeights.value = []
+    activeTab.value = products.value[0]?.key ?? null
+  } catch (error) {
+    console.error('상품 옵션 로딩 에러:', error)
+    loadError.value = '상품 옵션을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(async () => {
+  await loadProductOptions()
+})
+
+const moveToLandingCheckout = () => {
+  if (!selectedWeights.value.length) {
+    alert('옵션을 1개 이상 선택해 주세요.')
+    return
+  }
+
+  const selectedProducts = products.value.filter((product) =>
+    selectedWeights.value.includes(product.key),
+  )
+  const totalQuantity = selectedProducts.reduce(
+    (sum, product) => sum + (quantities.value[product.key] ?? 1),
+    0,
+  )
+
+  const optionSummary = selectedProducts
+    .map((product) => `${product.label} ${quantities.value[product.key] ?? 1}개`)
+    .join(', ')
+
+  router.push({
+    path: '/',
+    query: {
+      reorder: '1',
+      product_id: '0',
+      product_name: productName.value,
+      option_id: '0',
+      option_name: optionSummary,
+      quantity: String(totalQuantity),
+      total_amount: String(totalPrice.value),
+    },
+  })
+}
 </script>
 
 <template>
   <div class="min-h-screen bg-white">
-    <div class="mx-auto flex max-w-[480px] flex-col">
+    <div class="mx-auto flex max-w-[430px] flex-col">
       <div class="bg-white px-2 shadow-sm">
         <div class="flex items-center justify-start gap-2">
           <button
@@ -97,7 +173,13 @@ const decreaseQuantity = (key) => {
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-xl bg-white shadow-sm">
+      <div v-if="isLoading" class="rounded-xl bg-white p-5 text-sm text-gray-600 shadow-sm">
+        상품 정보를 불러오는 중입니다...
+      </div>
+      <div v-else-if="loadError" class="rounded-xl bg-white p-5 text-sm text-red-500 shadow-sm">
+        {{ loadError }}
+      </div>
+      <div v-else class="overflow-hidden rounded-xl bg-white shadow-sm">
         <img
           v-if="activeProduct?.imagePath"
           :src="activeProduct.imagePath"
@@ -109,7 +191,7 @@ const decreaseQuantity = (key) => {
         </div>
       </div>
 
-      <div class="bg-white p-3">
+      <div v-if="!isLoading && !loadError" class="bg-white p-3">
         <label class="mb-3 flex items-center gap-2 text-sm font-medium text-gray-700">
           <input v-model="isMember" type="checkbox" class="h-4 w-4" />
           <span>회원가 적용</span>
@@ -167,6 +249,7 @@ const decreaseQuantity = (key) => {
           <button
             type="button"
             class="mt-3 w-full rounded-lg bg-green-600 px-4 py-3 text-sm font-semibold text-white"
+            @click="moveToLandingCheckout"
           >
             주문하기 &gt;
           </button>
