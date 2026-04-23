@@ -1,22 +1,23 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { supabase } from '@/lib/supabase'
 
 const product = ref(null)
 const options = ref([])
 const selectedOptionId = ref(null)
-const quantity = ref(1)
 const isKakaoFriend = ref(false)
 const isLoading = ref(true)
 const loadError = ref('')
 
-const addressBook = ref([
-  {
-    receiver: '',
-    phone: '',
-    address: '',
-  },
-])
+const groupBuyError = ref('')
+const groupBuySuccess = ref('')
+const isCreatingGroupBuy = ref(false)
+const isLoadingMyGroupBuys = ref(false)
+const myGroupBuys = ref([])
+
+const totalQuantity = ref(2)
+const hostQuantity = ref(1)
+const shareLinkCount = ref(1)
 
 const selectedOption = computed(() => {
   return options.value.find((option) => option.id === selectedOptionId.value) || null
@@ -25,8 +26,8 @@ const selectedOption = computed(() => {
 const baseUnitPrice = computed(() => selectedOption.value?.price || 0)
 
 const groupDiscountPerItem = computed(() => {
-  if (quantity.value >= 10 && quantity.value <= 19) return 3000
-  if (quantity.value >= 5 && quantity.value <= 9) return 2000
+  if (totalQuantity.value >= 10 && totalQuantity.value <= 19) return 3000
+  if (totalQuantity.value >= 5 && totalQuantity.value <= 9) return 2000
   return 0
 })
 
@@ -40,9 +41,14 @@ const finalUnitPrice = computed(() => {
   return Math.max(baseUnitPrice.value - totalDiscountPerItem.value, 0)
 })
 
-const originTotal = computed(() => baseUnitPrice.value * quantity.value)
-const discountTotal = computed(() => totalDiscountPerItem.value * quantity.value)
-const paymentTotal = computed(() => finalUnitPrice.value * quantity.value)
+const originTotal = computed(() => baseUnitPrice.value * totalQuantity.value)
+const discountTotal = computed(() => totalDiscountPerItem.value * totalQuantity.value)
+const paymentTotal = computed(() => finalUnitPrice.value * totalQuantity.value)
+
+const shareLinkBase = computed(() => `${window.location.origin}/group-buy/join`)
+const isSplitRuleValid = computed(() => {
+  return hostQuantity.value + shareLinkCount.value === totalQuantity.value
+})
 
 const discountLabel = computed(() => {
   if (groupDiscountPerItem.value === 3000) return '공동구매 10~19개 구간 적용 (개당 3,000원 할인)'
@@ -50,77 +56,169 @@ const discountLabel = computed(() => {
   return '공동구매 할인 미적용 (5개 이상부터 적용)'
 })
 
-watch(
-  quantity,
-  (newQuantity) => {
-    const normalizedQuantity = Number.isFinite(newQuantity)
-      ? Math.max(1, Math.floor(newQuantity))
-      : 1
-    if (normalizedQuantity !== newQuantity) {
-      quantity.value = normalizedQuantity
-      return
-    }
-
-    const existing = [...addressBook.value]
-    const next = Array.from({ length: normalizedQuantity }, (_, index) => {
-      return (
-        existing[index] || {
-          receiver: '',
-          phone: '',
-          address: '',
-        }
-      )
-    })
-
-    addressBook.value = next
-  },
-  { immediate: true },
-)
-
-const increaseQty = () => {
-  quantity.value += 1
-}
-
-const decreaseQty = () => {
-  if (quantity.value > 1) quantity.value -= 1
-}
-
 const formatCurrency = (price) => `${price.toLocaleString()}원`
 
-const updateAddressField = (index, field, value) => {
-  const next = [...addressBook.value]
-  next[index] = {
-    ...next[index],
-    [field]: value,
-  }
-  addressBook.value = next
+const normalizeInteger = (value, minimum = 0) => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return minimum
+  return Math.max(minimum, Math.floor(parsed))
 }
 
-const sharePaymentInfo = async () => {
-  const shareText = [
-    `[고마마 공동구매] ${product.value?.name || '상품'}`,
-    `옵션: ${selectedOption.value?.name || '-'}`,
-    `수량: ${quantity.value}개`,
-    `결제 예정 금액: ${formatCurrency(paymentTotal.value)}`,
+const normalizeCounts = () => {
+  totalQuantity.value = normalizeInteger(totalQuantity.value, 1)
+  hostQuantity.value = normalizeInteger(hostQuantity.value, 1)
+  shareLinkCount.value = normalizeInteger(shareLinkCount.value, 0)
+}
+
+const generateInviteToken = () => {
+  const randomPart = crypto.randomUUID().replaceAll('-', '').slice(0, 18)
+  const timePart = Date.now().toString(36)
+  return `${timePart}${randomPart}`
+}
+
+const buildInviteUrl = (inviteToken) => `${shareLinkBase.value}?token=${inviteToken}`
+
+const shareOneInviteLink = async (inviteToken) => {
+  const url = buildInviteUrl(inviteToken)
+  const text = [
+    '[고마마 공동구매 참여 링크]',
+    `[상품] ${product.value?.name || '-'} / ${selectedOption.value?.name || '-'}`,
+    `아래 링크로 주소 입력 + 결제 부탁드려요.`,
+    url,
   ].join('\n')
 
   if (navigator.share) {
     try {
       await navigator.share({
-        title: '공동구매 결제 금액 공유',
-        text: shareText,
+        title: '공동구매 참여 요청',
+        text,
       })
       return
     } catch {
-      // 사용자가 취소했거나 공유 실패한 경우 clipboard fallback 실행
+      // fallback to clipboard
     }
   }
 
+  await navigator.clipboard.writeText(text)
+  alert('해당 참여자용 링크 문구를 복사했어요.')
+}
+
+const loadMyGroupBuys = async () => {
+  isLoadingMyGroupBuys.value = true
+
   try {
-    await navigator.clipboard.writeText(shareText)
-    alert('공유 문구를 복사했어요. 카카오톡에 붙여넣어 공유해 주세요!')
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError) throw sessionError
+
+    const userId = sessionData.session?.user?.id
+    if (!userId) {
+      myGroupBuys.value = []
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('group_buys')
+      .select(
+        'id, status, total_quantity, host_quantity, share_slot_count, created_at, group_buy_members(id, slot_no, invite_token, receiver, address, payment_status)',
+      )
+      .eq('host_user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    if (error) throw error
+    myGroupBuys.value = data || []
+  } catch (error) {
+    console.error('내 공동구매 목록 조회 에러:', error)
+  } finally {
+    isLoadingMyGroupBuys.value = false
+  }
+}
+
+const createGroupBuy = async () => {
+  normalizeCounts()
+  groupBuyError.value = ''
+  groupBuySuccess.value = ''
+
+  if (!selectedOption.value || !product.value?.id) {
+    groupBuyError.value = '상품/키로수를 먼저 선택해 주세요.'
+    return
+  }
+
+  if (!isSplitRuleValid.value) {
+    groupBuyError.value = '내 결제 수량 + 공유 링크 수가 총 수량과 같아야 해요.'
+    return
+  }
+
+  isCreatingGroupBuy.value = true
+
+  try {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError) throw sessionError
+
+    const user = sessionData.session?.user
+    if (!user) {
+      groupBuyError.value = '공동구매 생성은 로그인 후 이용할 수 있어요.'
+      return
+    }
+
+    const { data: createdGroupBuy, error: createError } = await supabase
+      .from('group_buys')
+      .insert({
+        host_user_id: user.id,
+        product_id: product.value.id,
+        option_id: selectedOption.value.id,
+        total_quantity: totalQuantity.value,
+        host_quantity: hostQuantity.value,
+        share_slot_count: shareLinkCount.value,
+        status: 'collecting',
+      })
+      .select('id')
+      .single()
+
+    if (createError) throw createError
+
+    const members = [
+      {
+        group_buy_id: createdGroupBuy.id,
+        slot_no: 1,
+        is_host: true,
+        quantity: hostQuantity.value,
+        payment_status: 'pending',
+      },
+      ...Array.from({ length: shareLinkCount.value }, (_, index) => ({
+        group_buy_id: createdGroupBuy.id,
+        slot_no: index + 2,
+        is_host: false,
+        quantity: 1,
+        invite_token: generateInviteToken(),
+        payment_status: 'pending',
+      })),
+    ]
+
+    const { data: createdMembers, error: memberError } = await supabase
+      .from('group_buy_members')
+      .insert(members)
+      .select('slot_no, invite_token')
+
+    if (memberError) throw memberError
+
+    const invitedCount = (createdMembers || []).filter((member) => member.invite_token).length
+    groupBuySuccess.value = `공동구매를 생성했어요. 아래 목록에서 ${invitedCount}명에게 링크를 각각 공유해 주세요.`
+    await loadMyGroupBuys()
+  } catch (error) {
+    console.error('공동구매 생성 에러:', error)
+    groupBuyError.value = '공동구매 생성에 실패했어요. 잠시 후 다시 시도해 주세요.'
+  } finally {
+    isCreatingGroupBuy.value = false
+  }
+}
+
+const copyMemberLink = async (inviteToken) => {
+  try {
+    await navigator.clipboard.writeText(buildInviteUrl(inviteToken))
+    alert('링크를 복사했어요.')
   } catch {
-    alert('공유를 지원하지 않는 환경이에요.\n' + shareText)
+    alert('링크 복사에 실패했어요.')
   }
 }
 
@@ -161,6 +259,7 @@ const loadGroupBuyData = async () => {
 
 onMounted(async () => {
   await loadGroupBuyData()
+  await loadMyGroupBuys()
 })
 </script>
 
@@ -169,9 +268,10 @@ onMounted(async () => {
     <div class="mx-auto w-full max-w-[430px] space-y-4">
       <section class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
         <p class="text-xs font-semibold tracking-wide text-[#15aabf]">공동구매</p>
-        <h1 class="mt-2 text-xl font-bold">수량 선택하면 바로 결제 금액 확인</h1>
+        <h1 class="mt-2 text-xl font-bold">공동구매 생성 · 링크 공유 · 결제 상태 확인</h1>
         <p class="mt-2 text-sm text-black/60">
-          5~9개는 개당 2,000원, 10~19개는 개당 3,000원 자동 할인돼요.
+          총 수량/내 결제 수량/공유 링크 수를 입력해 공동구매를 만들고, 링크별 결제 상태를
+          확인하세요.
         </p>
 
         <div class="mt-3 rounded-xl bg-[#f3f4f6] px-3 py-2 text-xs text-black/70">
@@ -217,73 +317,72 @@ onMounted(async () => {
               <p class="mt-1 text-xs">기본가 {{ formatCurrency(option.price) }}</p>
             </button>
           </div>
-
-          <div class="mt-5 flex items-center justify-between">
-            <span class="text-sm font-medium">수량 선택</span>
-            <div class="flex items-center gap-3">
-              <button
-                type="button"
-                class="h-9 w-9 rounded-full border border-black/10 text-lg"
-                @click="decreaseQty"
-              >
-                -
-              </button>
-              <span class="min-w-8 text-center font-semibold">{{ quantity }}</span>
-              <button
-                type="button"
-                class="h-9 w-9 rounded-full border border-black/10 text-lg"
-                @click="increaseQty"
-              >
-                +
-              </button>
-            </div>
-          </div>
         </section>
 
         <section class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
-          <h2 class="text-base font-semibold">주소록 (선택 수량만큼 생성)</h2>
-          <p class="mt-1 text-sm text-black/60">총 {{ addressBook.length }}개 배송지</p>
+          <h2 class="text-base font-semibold">공동구매 수량 설정</h2>
 
-          <div class="mt-4 space-y-3">
-            <div
-              v-for="(entry, index) in addressBook"
-              :key="index"
-              class="rounded-xl border border-black/10 p-3"
-            >
-              <p class="mb-2 text-xs font-semibold text-black/50">배송지 {{ index + 1 }}</p>
-
-              <label class="mb-2 block text-xs text-black/60">수령인</label>
+          <div class="mt-3 grid grid-cols-3 gap-2">
+            <label class="text-xs text-black/60">
+              총 수량
               <input
-                :value="entry.receiver"
-                type="text"
-                class="mb-2 w-full rounded-lg border border-black/10 px-3 py-2 text-sm"
-                placeholder="수령인 이름"
-                @input="updateAddressField(index, 'receiver', $event.target.value)"
+                v-model.number="totalQuantity"
+                type="number"
+                min="1"
+                class="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm"
+                @change="normalizeCounts"
               />
+            </label>
 
-              <label class="mb-2 block text-xs text-black/60">연락처</label>
+            <label class="text-xs text-black/60">
+              내 결제 수량
               <input
-                :value="entry.phone"
-                type="text"
-                class="mb-2 w-full rounded-lg border border-black/10 px-3 py-2 text-sm"
-                placeholder="010-0000-0000"
-                @input="updateAddressField(index, 'phone', $event.target.value)"
+                v-model.number="hostQuantity"
+                type="number"
+                min="1"
+                class="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm"
+                @change="normalizeCounts"
               />
+            </label>
 
-              <label class="mb-2 block text-xs text-black/60">주소</label>
+            <label class="text-xs text-black/60">
+              공유 링크 수
               <input
-                :value="entry.address"
-                type="text"
-                class="w-full rounded-lg border border-black/10 px-3 py-2 text-sm"
-                placeholder="도로명 주소"
-                @input="updateAddressField(index, 'address', $event.target.value)"
+                v-model.number="shareLinkCount"
+                type="number"
+                min="0"
+                class="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm"
+                @change="normalizeCounts"
               />
-            </div>
+            </label>
           </div>
+
+          <p class="mt-3 rounded-lg bg-[#f8f9fa] px-3 py-2 text-xs text-black/70">
+            검증: 내 결제 {{ hostQuantity }} + 링크 {{ shareLinkCount }} = 총 {{ totalQuantity }}
+          </p>
+          <p v-if="!isSplitRuleValid" class="mt-2 text-xs font-medium text-red-500">
+            수량 규칙이 맞지 않아요. 값을 다시 확인해 주세요.
+          </p>
+
+          <button
+            type="button"
+            class="mt-3 w-full rounded-xl bg-[#15aabf] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-black/20"
+            :disabled="isCreatingGroupBuy || !isSplitRuleValid"
+            @click="createGroupBuy"
+          >
+            {{ isCreatingGroupBuy ? '생성 중...' : '공동구매 생성 & 링크 공유' }}
+          </button>
+
+          <p v-if="groupBuyError" class="mt-2 text-xs font-semibold text-red-500">
+            {{ groupBuyError }}
+          </p>
+          <p v-if="groupBuySuccess" class="mt-2 text-xs font-semibold text-[#0ca678]">
+            {{ groupBuySuccess }}
+          </p>
         </section>
 
         <section class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
-          <h2 class="text-base font-semibold">결제 금액</h2>
+          <h2 class="text-base font-semibold">예상 결제 금액</h2>
 
           <div class="mt-4 space-y-2 text-sm">
             <div class="flex items-center justify-between">
@@ -301,14 +400,88 @@ onMounted(async () => {
               <span>{{ formatCurrency(paymentTotal) }}</span>
             </div>
           </div>
+        </section>
 
-          <button
-            type="button"
-            class="mt-4 w-full rounded-xl bg-[#fee500] px-4 py-3 text-sm font-semibold text-black"
-            @click="sharePaymentInfo"
-          >
-            카카오톡으로 결제 금액 공유하기
-          </button>
+        <section class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-semibold">내 공동구매 현황</h2>
+            <button
+              type="button"
+              class="text-xs font-semibold text-[#15aabf]"
+              @click="loadMyGroupBuys"
+            >
+              새로고침
+            </button>
+          </div>
+
+          <p v-if="isLoadingMyGroupBuys" class="mt-2 text-xs text-black/50">불러오는 중...</p>
+          <p v-else-if="!myGroupBuys.length" class="mt-2 text-xs text-black/50">
+            생성한 공동구매가 없습니다.
+          </p>
+
+          <div v-else class="mt-3 space-y-3">
+            <article
+              v-for="group in myGroupBuys"
+              :key="group.id"
+              class="rounded-xl border border-black/10 p-3"
+            >
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-semibold">상태: {{ group.status }}</span>
+                <span class="text-black/50">{{ new Date(group.created_at).toLocaleString() }}</span>
+              </div>
+              <p class="mt-1 text-xs text-black/60">
+                총 {{ group.total_quantity }}개 / 내 결제 {{ group.host_quantity }}개 / 링크
+                {{ group.share_slot_count }}개
+              </p>
+
+              <div class="mt-2 overflow-x-auto">
+                <table class="min-w-full text-left text-xs">
+                  <thead class="text-black/50">
+                    <tr>
+                      <th class="py-1 pr-3">슬롯</th>
+                      <th class="py-1 pr-3">결제</th>
+                      <th class="py-1 pr-3">주소입력</th>
+                      <th class="py-1">링크</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="member in group.group_buy_members"
+                      :key="member.id"
+                      class="border-t border-black/5"
+                    >
+                      <td class="py-1 pr-3">#{{ member.slot_no }}</td>
+                      <td class="py-1 pr-3">{{ member.payment_status }}</td>
+                      <td class="py-1 pr-3">
+                        {{ member.receiver && member.address ? '완료' : '미입력' }}
+                      </td>
+                      <td class="py-1">
+                        <template v-if="member.invite_token">
+                          <div class="flex items-center gap-2">
+                            <button
+                              type="button"
+                              class="text-[#15aabf] underline"
+                              @click="copyMemberLink(member.invite_token)"
+                            >
+                              복사
+                            </button>
+                            <button
+                              type="button"
+                              class="text-[#0ca678] underline"
+                              @click="shareOneInviteLink(member.invite_token)"
+                            >
+                              공유
+                            </button>
+                          </div>
+                        </template>
+                        <span v-else class="text-black/40">호스트</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
         </section>
       </template>
     </div>
