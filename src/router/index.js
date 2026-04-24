@@ -5,6 +5,7 @@ import PaymentSuccessPage from '@/views/PaymentSuccessPage.vue'
 import PaymentFailPage from '@/views/PaymentFailPage.vue'
 import ShoppingPage from '@/views/ShoppingPage.vue'
 import GroupBuyPage from '@/views/GroupBuyPage.vue'
+import GroupBuyJoinPage from '@/views/GroupBuyJoinPage.vue'
 import OrdersPage from '@/views/OrdersPage.vue'
 import MyPage from '@/views/MyPage.vue'
 import { useSplashLoading } from '@/stores/splashLoading'
@@ -48,6 +49,15 @@ const router = createRouter({
       meta: {
         title: '공동구매',
         description: '공동구매 메뉴는 곧 연결될 예정입니다',
+      },
+    },
+    {
+      path: '/group-buy/join',
+      name: 'group-buy-join',
+      component: GroupBuyJoinPage,
+      meta: {
+        title: '공동구매 참여',
+        description: '공유 링크를 통해 공동구매에 참여해요',
       },
     },
     {

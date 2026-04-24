@@ -12,6 +12,7 @@ const loadError = ref('')
 const groupBuyError = ref('')
 const groupBuySuccess = ref('')
 const isCreatingGroupBuy = ref(false)
+const deletingGroupBuyId = ref(null)
 const isLoadingMyGroupBuys = ref(false)
 const myGroupBuys = ref([])
 
@@ -222,6 +223,30 @@ const copyMemberLink = async (inviteToken) => {
   }
 }
 
+const deleteGroupBuy = async (groupBuyId) => {
+  const confirmed = window.confirm(
+    '이 공동구매를 삭제할까요? 관련 링크/멤버 정보도 함께 삭제됩니다.',
+  )
+  if (!confirmed) return
+
+  groupBuyError.value = ''
+  groupBuySuccess.value = ''
+  deletingGroupBuyId.value = groupBuyId
+
+  try {
+    const { error } = await supabase.from('group_buys').delete().eq('id', groupBuyId)
+    if (error) throw error
+
+    groupBuySuccess.value = '공동구매를 삭제했어요.'
+    await loadMyGroupBuys()
+  } catch (error) {
+    console.error('공동구매 삭제 에러:', error)
+    groupBuyError.value = '공동구매 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.'
+  } finally {
+    deletingGroupBuyId.value = null
+  }
+}
+
 const loadGroupBuyData = async () => {
   isLoading.value = true
   loadError.value = ''
@@ -427,7 +452,19 @@ onMounted(async () => {
             >
               <div class="flex items-center justify-between text-xs">
                 <span class="font-semibold">상태: {{ group.status }}</span>
-                <span class="text-black/50">{{ new Date(group.created_at).toLocaleString() }}</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-black/50">{{
+                    new Date(group.created_at).toLocaleString()
+                  }}</span>
+                  <button
+                    type="button"
+                    class="rounded-md border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="deletingGroupBuyId === group.id"
+                    @click="deleteGroupBuy(group.id)"
+                  >
+                    {{ deletingGroupBuyId === group.id ? '삭제중...' : '삭제' }}
+                  </button>
+                </div>
               </div>
               <p class="mt-1 text-xs text-black/60">
                 총 {{ group.total_quantity }}개 / 내 결제 {{ group.host_quantity }}개 / 링크

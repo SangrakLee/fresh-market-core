@@ -29,10 +29,10 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
-    // 이번에 추가: DB에서 주문 조회
+    // DB에서 주문 조회
     const { data: orderRow, error: orderError } = await supabaseAdmin
       .from('orders')
-      .select('id, total_amount, order_status')
+      .select('id, total_amount, order_status, recipient_name, recipient_phone, recipient_address')
       .eq('order_code', orderId)
       .single()
 
@@ -111,6 +111,24 @@ Deno.serve(async (req) => {
         failed_reason: null,
       })
       .eq('order_code', orderId)
+
+      const groupBuyMemberIdMatch = String(orderId).match(/^gbm_([0-9a-f-]{36})_/i)
+    const groupBuyMemberId = groupBuyMemberIdMatch?.[1]
+    if (groupBuyMemberId) {
+      await supabaseAdmin
+        .from('group_buy_members')
+        .update({
+          payment_status: 'paid',
+          payment_tx_id: tossResult.paymentKey || paymentKey,
+          order_id: orderRow.id,
+          paid_at: new Date().toISOString(),
+          receiver: orderRow.recipient_name || null,
+          phone: orderRow.recipient_phone || null,
+          address: orderRow.recipient_address || null,
+        })
+        .eq('id', groupBuyMemberId)
+    }
+
 
     return new Response(JSON.stringify(tossResult), {
       status: 200,
