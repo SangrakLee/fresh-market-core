@@ -123,7 +123,7 @@ const loadMyGroupBuys = async () => {
     const { data, error } = await supabase
       .from('group_buys')
       .select(
-        'id, status, total_quantity, host_quantity, share_slot_count, created_at, products:product_id(name), product_options:option_id(name,price), group_buy_members(id, slot_no, is_host, quantity, invite_token, receiver, phone, address, payment_status)',
+        'id, product_id, option_id, status, total_quantity, host_quantity, share_slot_count, created_at, products:product_id(name), product_options:option_id(name,price), group_buy_members(id, slot_no, is_host, quantity, invite_token, receiver, phone, address, payment_status)',
       )
       .eq('host_user_id', userId)
       .order('created_at', { ascending: false })
@@ -294,8 +294,14 @@ const payHostMember = async (group, hostMember) => {
   const unitPrice = Number(group?.product_options?.price || 0)
   const quantity = Number(hostMember.quantity || 1)
   const totalAmount = unitPrice * quantity
+  const productId = Number(group?.product_id || 0)
+  const optionId = Number(group?.option_id || 0)
   if (totalAmount <= 0) {
     alert('결제 금액 계산에 실패했어요. 옵션 가격을 확인해 주세요.')
+    return
+  }
+  if (!productId || !optionId) {
+    alert('상품/옵션 정보가 누락되어 결제를 진행할 수 없어요.')
     return
   }
 
@@ -305,9 +311,9 @@ const payHostMember = async (group, hostMember) => {
   try {
     const { error } = await supabase.from('orders').insert([
       {
-        product_id: null,
+        product_id: productId,
         product_name: group?.products?.name || product.value?.name || '공동구매 상품',
-        option_id: null,
+        option_id: optionId,
         option_name: group?.product_options?.name || selectedOption.value?.name || '옵션',
         quantity,
         total_amount: totalAmount,
