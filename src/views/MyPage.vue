@@ -7,12 +7,62 @@ const router = useRouter()
 
 const session = ref(null)
 const authUserLabel = ref('')
+const memberType = ref('비회원')
+const relationStatus = ref('')
+
+const resolveMemberType = (hasSession) => {
+  if (!hasSession) return '비회원'
+
+  // 카카오 채널 관계 조회 전 기본값
+  return '회원'
+}
+
+const getKakaoTargetId = async (providerToken) => {
+  if (!providerToken) return null
+
+  const meResponse = await fetch('https://kapi.kakao.com/v2/user/me', {
+    headers: {
+      Authorization: `Bearer ${providerToken}`,
+    },
+  })
+
+  if (!meResponse.ok) {
+    const errorBody = await meResponse.text()
+    throw new Error(`카카오 사용자 조회 실패: ${meResponse.status} ${errorBody}`)
+  }
+
+  const me = await meResponse.json()
+  return me?.id ? String(me.id) : null
+}
+
+const fetchMemberTypeFromKakaoRelation = async (currentSession) => {
+  const providerToken = currentSession?.provider_token
+  const targetId = await getKakaoTargetId(providerToken)
+  if (!targetId) return
+
+  const { data, error } = await supabase.functions.invoke('check-kakao-channel-relation', {
+    body: { targetId },
+  })
+
+  if (error) {
+    throw new Error(error.message || '카카오 채널 관계 조회 함수 호출 실패')
+  }
+
+  if (data?.memberType) {
+    memberType.value = data.memberType
+    relationStatus.value = Array.isArray(data.relations) ? data.relations.join(', ') : ''
+  }
+}
 
 const signInWithKakao = async () => {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'kakao',
     options: {
       redirectTo: `${window.location.origin}/auth/callback`,
+      scopes: 'profile_nickname profile_image account_email plusfriends',
+      queryParams: {
+        prompt: 'consent',
+      },
     },
   })
 
@@ -31,16 +81,26 @@ const signOut = async () => {
 
   session.value = null
   authUserLabel.value = ''
+  memberType.value = resolveMemberType(false)
+  relationStatus.value = ''
   router.push('/')
 }
 
 onMounted(async () => {
   const { data } = await supabase.auth.getSession()
-  session.value = data.session || null
+  const currentSession = data.session || null
+  session.value = currentSession
+  memberType.value = resolveMemberType(!!session.value)
 
   if (session.value?.user) {
     authUserLabel.value =
       session.value.user.email || session.value.user.user_metadata?.name || '카카오 사용자'
+
+    try {
+      await fetchMemberTypeFromKakaoRelation(currentSession)
+    } catch (error) {
+      console.error('카카오 채널 관계 연동 에러:', error)
+    }
   }
 })
 </script>
@@ -52,6 +112,13 @@ onMounted(async () => {
         <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
           <div class="text-sm font-bold text-gray-900">로그인됨</div>
           <div class="mt-1 text-sm text-gray-500">{{ authUserLabel }}</div>
+          <div class="mt-2 text-sm text-gray-700">
+            회원 구분:
+            <span class="font-semibold text-gray-900">{{ memberType }}</span>
+          </div>
+          <div v-if="relationStatus" class="mt-1 text-xs text-gray-500">
+            카카오 채널 관계: {{ relationStatus }}
+          </div>
 
           <div class="mt-4 space-y-3">
             <button
@@ -75,6 +142,10 @@ onMounted(async () => {
         <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
           <div class="text-sm font-bold text-gray-900">비회원 상태</div>
           <div class="mt-1 text-sm text-gray-500">카카오 로그인 후 이용할 수 있어요</div>
+          <div class="mt-2 text-sm text-gray-700">
+            회원 구분:
+            <span class="font-semibold text-gray-900">{{ memberType }}</span>
+          </div>
 
           <button
             class="mt-4 w-full rounded-xl bg-yellow-400 px-4 py-3 text-sm font-semibold text-gray-900 transition hover:bg-yellow-300"
