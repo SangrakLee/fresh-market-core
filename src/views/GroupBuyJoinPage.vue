@@ -49,7 +49,9 @@ const loadJoinInfo = async () => {
       p_token: inviteToken.value,
     })
 
-    if (error) throw error
+    if (error) {
+      throw new Error(`공동구매 참여정보 RPC 호출 실패: ${error.message}`)
+    }
 
     const row = Array.isArray(data) ? data[0] : null
     if (!row) {
@@ -65,7 +67,10 @@ const loadJoinInfo = async () => {
     joinInfo.value = row
   } catch (error) {
     console.error('공동구매 참여 정보 조회 에러:', error)
-    loadError.value = '공동구매 참여 정보를 불러오지 못했어요.'
+    loadError.value =
+      error instanceof Error
+        ? error.message
+        : '공동구매 참여 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
   } finally {
     isLoading.value = false
   }

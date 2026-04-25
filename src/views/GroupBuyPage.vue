@@ -1,4 +1,5 @@
 <script setup>
+/* global TossPayments */
 import { computed, onMounted, ref } from 'vue'
 import { supabase } from '@/lib/supabase'
 
@@ -13,12 +14,14 @@ const groupBuyError = ref('')
 const groupBuySuccess = ref('')
 const isCreatingGroupBuy = ref(false)
 const deletingGroupBuyId = ref(null)
+const payingHostMemberId = ref(null)
 const isLoadingMyGroupBuys = ref(false)
 const myGroupBuys = ref([])
 
 const totalQuantity = ref(2)
 const hostQuantity = ref(1)
 const shareLinkCount = ref(1)
+const tossClientKey = import.meta.env.VITE_TOSS_CLIENT_KEY
 
 const selectedOption = computed(() => {
   return options.value.find((option) => option.id === selectedOptionId.value) || null
@@ -120,7 +123,7 @@ const loadMyGroupBuys = async () => {
     const { data, error } = await supabase
       .from('group_buys')
       .select(
-        'id, status, total_quantity, host_quantity, share_slot_count, created_at, group_buy_members(id, slot_no, invite_token, receiver, address, payment_status)',
+        'id, status, total_quantity, host_quantity, share_slot_count, created_at, products:product_id(name), product_options:option_id(name,price), group_buy_members(id, slot_no, is_host, quantity, invite_token, receiver, phone, address, payment_status)',
       )
       .eq('host_user_id', userId)
       .order('created_at', { ascending: false })
@@ -234,8 +237,15 @@ const deleteGroupBuy = async (groupBuyId) => {
   deletingGroupBuyId.value = groupBuyId
 
   try {
-    const { error } = await supabase.from('group_buys').delete().eq('id', groupBuyId)
+    const { data: deletedRows, error } = await supabase
+      .from('group_buys')
+      .delete()
+      .eq('id', groupBuyId)
+      .select('id')
     if (error) throw error
+    if (!deletedRows?.length) {
+      throw new Error('삭제 권한이 없거나 RLS 정책이 적용되지 않았습니다.')
+    }
 
     groupBuySuccess.value = '공동구매를 삭제했어요.'
     await loadMyGroupBuys()
@@ -244,6 +254,89 @@ const deleteGroupBuy = async (groupBuyId) => {
     groupBuyError.value = '공동구매 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.'
   } finally {
     deletingGroupBuyId.value = null
+  }
+}
+
+const buildGroupBuyOrderCode = (memberId) => {
+  return `gbm_${memberId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+const openTossPayment = async ({ orderCode, totalAmount, orderName, customerName }) => {
+  const tossPayments = TossPayments(tossClientKey)
+  const payment = tossPayments.payment({
+    customerKey: 'group-buy-host',
+  })
+
+  await payment.requestPayment({
+    method: 'CARD',
+    amount: {
+      currency: 'KRW',
+      value: totalAmount,
+    },
+    orderId: orderCode,
+    orderName,
+    customerName,
+    successUrl: `${window.location.origin}/payment/success`,
+    failUrl: `${window.location.origin}/payment/fail`,
+  })
+}
+
+const payHostMember = async (group, hostMember) => {
+  const receiver = prompt('수령인 이름을 입력해 주세요.', hostMember.receiver || '')?.trim() || ''
+  if (!receiver) return
+
+  const phone = prompt('연락처를 입력해 주세요.', hostMember.phone || '')?.trim() || ''
+  if (!phone) return
+
+  const address = prompt('주소를 입력해 주세요.', hostMember.address || '')?.trim() || ''
+  if (!address) return
+
+  const unitPrice = Number(group?.product_options?.price || 0)
+  const quantity = Number(hostMember.quantity || 1)
+  const totalAmount = unitPrice * quantity
+  if (totalAmount <= 0) {
+    alert('결제 금액 계산에 실패했어요. 옵션 가격을 확인해 주세요.')
+    return
+  }
+
+  const orderCode = buildGroupBuyOrderCode(hostMember.id)
+  payingHostMemberId.value = hostMember.id
+
+  try {
+    const { error } = await supabase.from('orders').insert([
+      {
+        product_id: null,
+        product_name: group?.products?.name || product.value?.name || '공동구매 상품',
+        option_id: null,
+        option_name: group?.product_options?.name || selectedOption.value?.name || '옵션',
+        quantity,
+        total_amount: totalAmount,
+        recipient_name: receiver,
+        recipient_phone: phone,
+        recipient_address: address,
+        recipient_zonecode: '',
+        recipient_base_address: '',
+        recipient_detail_address: address,
+        delivery_message: '공동구매 주최자 결제',
+        user_id: null,
+        order_code: orderCode,
+        order_status: 'pending',
+      },
+    ])
+
+    if (error) throw error
+
+    await openTossPayment({
+      orderCode,
+      totalAmount,
+      orderName: `[공동구매-주최자] ${group?.products?.name || '공동구매 상품'} ${group?.product_options?.name || ''}`,
+      customerName: receiver,
+    })
+  } catch (error) {
+    console.error('주최자 결제 준비 에러:', error)
+    alert('주최자 결제 준비 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.')
+  } finally {
+    payingHostMemberId.value = null
   }
 }
 
@@ -470,6 +563,10 @@ onMounted(async () => {
                 총 {{ group.total_quantity }}개 / 내 결제 {{ group.host_quantity }}개 / 링크
                 {{ group.share_slot_count }}개
               </p>
+              <p class="mt-1 text-xs text-black/50">
+                상품: {{ group.products?.name || '-' }} / 옵션:
+                {{ group.product_options?.name || '-' }}
+              </p>
 
               <div class="mt-2 overflow-x-auto">
                 <table class="min-w-full text-left text-xs">
@@ -493,7 +590,23 @@ onMounted(async () => {
                         {{ member.receiver && member.address ? '완료' : '미입력' }}
                       </td>
                       <td class="py-1">
-                        <template v-if="member.invite_token">
+                        <template v-if="member.is_host">
+                          <button
+                            v-if="member.payment_status !== 'paid'"
+                            type="button"
+                            class="text-[#f08c00] underline disabled:opacity-50"
+                            :disabled="payingHostMemberId === member.id"
+                            @click="payHostMember(group, member)"
+                          >
+                            {{
+                              payingHostMemberId === member.id
+                                ? '결제 준비중...'
+                                : '주최자 결제하기'
+                            }}
+                          </button>
+                          <span v-else class="text-[#0ca678]">결제완료</span>
+                        </template>
+                        <template v-else-if="member.invite_token">
                           <div class="flex items-center gap-2">
                             <button
                               type="button"
@@ -511,7 +624,7 @@ onMounted(async () => {
                             </button>
                           </div>
                         </template>
-                        <span v-else class="text-black/40">호스트</span>
+                        <span v-else class="text-black/40">-</span>
                       </td>
                     </tr>
                   </tbody>

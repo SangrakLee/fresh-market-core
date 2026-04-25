@@ -14,6 +14,22 @@ const isApproving = ref(false)
 const approveMessage = ref('')
 const approveError = ref('')
 
+const resolveInvokeErrorMessage = async (error) => {
+  const baseMessage = error?.message || '승인 요청 실패'
+  const context = error?.context
+  if (!context) return baseMessage
+
+  try {
+    const payload = await context.json()
+    if (payload?.message) return `${baseMessage} - ${payload.message}`
+    if (payload?.error) return `${baseMessage} - ${payload.error}`
+  } catch {
+    // context body parse 실패 시 기본 메시지 사용
+  }
+
+  return baseMessage
+}
+
 const confirmPayment = async () => {
   isApproving.value = true
   approveMessage.value = ''
@@ -28,7 +44,7 @@ const confirmPayment = async () => {
   })
 
   if (error) {
-    approveError.value = error.message || '승인 요청 실패'
+    approveError.value = await resolveInvokeErrorMessage(error)
     isApproving.value = false
     return
   }
