@@ -1,6 +1,6 @@
 <script setup>
 import { Citrus } from 'lucide-vue-next'
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
 const detailImageModules = import.meta.glob('../assets/images/detail-img/*.{jpg,jpeg,png,webp}', {
@@ -9,6 +9,41 @@ const detailImageModules = import.meta.glob('../assets/images/detail-img/*.{jpg,
 })
 
 const detailImagePaths = Object.values(detailImageModules).sort()
+const heroScrollRef = ref(null)
+
+const activeImageIndex = computed(() => {
+  const index = products.value.findIndex((product) => product.key === activeTab.value)
+  return index >= 0 ? index : 0
+})
+
+const setActiveProduct = async (key, smooth = true) => {
+  activeTab.value = key
+
+  await nextTick()
+
+  const container = heroScrollRef.value
+  if (!container) return
+
+  const index = products.value.findIndex((product) => product.key === key)
+  if (index < 0) return
+
+  container.scrollTo({
+    left: container.clientWidth * index,
+    behavior: smooth ? 'smooth' : 'auto',
+  })
+}
+
+const handleHeroScroll = () => {
+  const container = heroScrollRef.value
+  if (!container || !products.value.length) return
+
+  const index = Math.round(container.scrollLeft / container.clientWidth)
+  const targetProduct = products.value[index]
+
+  if (targetProduct) {
+    activeTab.value = targetProduct.key
+  }
+}
 
 const products = ref([])
 const isLoading = ref(false)
@@ -184,6 +219,10 @@ const loadProductOptions = async () => {
 
 onMounted(async () => {
   await Promise.all([loadProductOptions(), loadMemberInfo()])
+
+  if (products.value.length > 0) {
+    await setActiveProduct(products.value[0].key, false)
+  }
 })
 
 const moveToLandingCheckout = () => {
@@ -222,38 +261,6 @@ const moveToLandingCheckout = () => {
 <template>
   <div class="min-h-screen bg-white">
     <div class="mx-auto max-w-[430px] pb-4">
-      <!-- 상단 옵션 탭 -->
-      <div class="sticky top-0 z-40 bg-white/95 px-3 py-2 shadow-sm backdrop-blur">
-        <div class="flex items-center gap-2 overflow-x-auto">
-          <button
-            v-for="product in products"
-            :key="product.key"
-            type="button"
-            class="flex min-w-[68px] flex-col items-center gap-1 rounded-2xl px-2 py-2 transition"
-            :class="activeTab === product.key ? 'bg-green-50' : 'bg-white'"
-            @click="activeTab = product.key"
-          >
-            <span
-              class="flex h-10 w-10 items-center justify-center rounded-full border"
-              :class="
-                activeTab === product.key
-                  ? 'border-green-500 bg-green-100 text-green-700'
-                  : 'border-gray-200 bg-gray-50 text-gray-500'
-              "
-            >
-              <Citrus class="h-4 w-4" aria-hidden="true" />
-            </span>
-
-            <span
-              class="text-[11px] font-extrabold"
-              :class="activeTab === product.key ? 'text-gray-900' : 'text-gray-500'"
-            >
-              {{ product.label }}
-            </span>
-          </button>
-        </div>
-      </div>
-
       <!-- 로딩 -->
       <div v-if="isLoading" class="gm-loading-overlay">
         <div class="gm-loading-box">
@@ -284,24 +291,45 @@ const moveToLandingCheckout = () => {
       <template v-else>
         <!-- 상품 이미지 헤더 -->
         <div class="gm-product-hero">
-          <div class="gm-product-image-wrap">
-            <img
-              v-if="activeProduct?.imagePath"
-              :src="activeProduct.imagePath"
-              :alt="`${activeProduct.label} 상품 이미지`"
-              class="gm-product-image"
-            />
-
+          <div class="gm-product-image-wrap relative">
             <div
-              v-else
-              class="flex h-full w-full items-center justify-center text-sm font-bold text-gray-500"
+              ref="heroScrollRef"
+              class="gm-no-scrollbar flex h-full snap-x snap-mandatory overflow-x-auto scroll-smooth"
+              @scroll="handleHeroScroll"
             >
-              이미지가 준비되지 않았습니다.
+              <div
+                v-for="product in products"
+                :key="`hero-${product.key}`"
+                class="h-full min-w-full snap-center"
+              >
+                <img
+                  v-if="product.imagePath"
+                  :src="product.imagePath"
+                  :alt="`${product.label} 상품 이미지`"
+                  class="gm-product-image"
+                />
+
+                <div
+                  v-else
+                  class="flex h-full w-full items-center justify-center text-sm font-bold text-gray-500"
+                >
+                  이미지가 준비되지 않았습니다.
+                </div>
+              </div>
             </div>
 
             <div class="gm-product-image-badges">
               <span class="gm-badge gm-badge-primary">오늘 수확</span>
               <span class="gm-badge gm-badge-soft">정품 선별</span>
+            </div>
+
+            <!-- 이미지 숫자 라벨 -->
+            <div class="absolute bottom-4 right-4">
+              <span
+                class="rounded-full bg-black/55 px-3 py-1 text-xs font-extrabold text-white backdrop-blur"
+              >
+                {{ activeImageIndex + 1 }} / {{ products.length }}
+              </span>
             </div>
           </div>
 
@@ -370,7 +398,7 @@ const moveToLandingCheckout = () => {
                   v-model="selectedWeights"
                   type="checkbox"
                   :value="product.key"
-                  @change="activeTab = product.key"
+                  @change="setActiveProduct(product.key)"
                 />
 
                 <span class="gm-option-card-body">

@@ -1182,3 +1182,12 @@
     opacity: 1;
   }
 }
+
+.gm-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.gm-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
