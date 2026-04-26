@@ -3,7 +3,6 @@ import { Citrus } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
-
 const detailImageModules = import.meta.glob('../assets/images/detail-img/*.{jpg,jpeg,png,webp}', {
   eager: true,
   import: 'default',
@@ -17,10 +16,19 @@ const loadError = ref('')
 const activeTab = ref(null)
 const selectedWeights = ref([])
 const quantities = ref({})
-const isMember = ref(false)
+const memberType = ref('비회원')
+const customerName = ref('고객')
 const productName = ref('참외')
 const router = useRouter()
+const isMember = computed(() => memberType.value !== '비회원')
 
+const memberStatusMessage = computed(() => {
+  if (!isMember.value) {
+    return '비회원입니다.'
+  }
+
+  return `${memberType.value} ${customerName.value}님 회원가 적용됩니다.`
+})
 const activeProduct = computed(
   () =>
     products.value.find((product) => product.key === activeTab.value) ?? products.value[0] ?? null,
@@ -40,6 +48,80 @@ const totalPrice = computed(() =>
     return total + unitPrice * (quantities.value[key] ?? 1)
   }, 0),
 )
+
+const selectedProducts = computed(() =>
+  products.value.filter((product) => selectedWeights.value.includes(product.key)),
+)
+
+const totalSelectedQuantity = computed(() =>
+  selectedProducts.value.reduce((sum, product) => sum + (quantities.value[product.key] ?? 1), 0),
+)
+
+const bottomActionLabel = computed(() => {
+  if (!selectedProducts.value.length) {
+    return '옵션을 선택해 주세요'
+  }
+
+  return `${selectedProducts.value.length}개 옵션 · ${totalSelectedQuantity.value}박스`
+})
+
+const getKakaoTargetId = async (providerToken) => {
+  if (!providerToken) return null
+
+  const meResponse = await fetch('https://kapi.kakao.com/v2/user/me', {
+    headers: {
+      Authorization: `Bearer ${providerToken}`,
+    },
+  })
+
+  if (!meResponse.ok) {
+    const errorBody = await meResponse.text()
+    throw new Error(`카카오 사용자 조회 실패: ${meResponse.status} ${errorBody}`)
+  }
+
+  const me = await meResponse.json()
+  return me?.id ? String(me.id) : null
+}
+
+const loadMemberInfo = async () => {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const currentSession = data.session || null
+
+    if (!currentSession?.user) {
+      memberType.value = '비회원'
+      customerName.value = '고객'
+      return
+    }
+
+    memberType.value = '회원'
+    customerName.value =
+      currentSession.user.user_metadata?.name || currentSession.user.email || '고객'
+
+    const targetId = await getKakaoTargetId(currentSession.provider_token)
+
+    if (!targetId) return
+
+    const { data: relationData, error: relationError } = await supabase.functions.invoke(
+      'check-kakao-channel-relation',
+      {
+        body: { targetId },
+      },
+    )
+
+    if (relationError) {
+      throw new Error(relationError.message || '카카오 채널 관계 조회 함수 호출 실패')
+    }
+
+    if (relationData?.memberType) {
+      memberType.value = relationData.memberType
+    }
+  } catch (error) {
+    console.error('회원 정보 로딩 에러:', error)
+    memberType.value = '비회원'
+    customerName.value = '고객'
+  }
+}
 
 const increaseQuantity = (key) => {
   quantities.value[key] = (quantities.value[key] ?? 1) + 1
@@ -101,7 +183,7 @@ const loadProductOptions = async () => {
 }
 
 onMounted(async () => {
-  await loadProductOptions()
+  await Promise.all([loadProductOptions(), loadMemberInfo()])
 })
 
 const moveToLandingCheckout = () => {
@@ -139,122 +221,296 @@ const moveToLandingCheckout = () => {
 
 <template>
   <div class="min-h-screen bg-white">
-    <div class="mx-auto flex max-w-[430px] flex-col">
-      <div class="bg-white px-2 shadow-sm">
-        <div class="flex items-center justify-start gap-2">
+    <div class="mx-auto max-w-[430px] pb-4">
+      <!-- 상단 옵션 탭 -->
+      <div class="sticky top-0 z-40 bg-white/95 px-3 py-2 shadow-sm backdrop-blur">
+        <div class="flex items-center gap-2 overflow-x-auto">
           <button
             v-for="product in products"
             :key="product.key"
             type="button"
-            class="flex flex-col items-center gap-0.5 rounded-lg px-2 py-1 transition"
+            class="flex min-w-[68px] flex-col items-center gap-1 rounded-2xl px-2 py-2 transition"
+            :class="activeTab === product.key ? 'bg-green-50' : 'bg-white'"
             @click="activeTab = product.key"
           >
             <span
-              class="flex h-9 w-9 items-center justify-center rounded-full"
+              class="flex h-10 w-10 items-center justify-center rounded-full border"
               :class="
                 activeTab === product.key
-                  ? 'border-yellow-400 bg-yellow-100 text-yellow-700'
+                  ? 'border-green-500 bg-green-100 text-green-700'
                   : 'border-gray-200 bg-gray-50 text-gray-500'
               "
             >
               <Citrus class="h-4 w-4" aria-hidden="true" />
             </span>
+
             <span
-              class="text-[11px] font-semibold"
+              class="text-[11px] font-extrabold"
               :class="activeTab === product.key ? 'text-gray-900' : 'text-gray-500'"
             >
               {{ product.label }}
             </span>
-            <span
-              class="h-0.5 w-7 rounded-full"
-              :class="activeTab === product.key ? 'bg-yellow-400' : 'bg-transparent'"
-            />
           </button>
         </div>
       </div>
 
-      <div v-if="isLoading" class="rounded-xl bg-white p-5 text-sm text-gray-600 shadow-sm">
-        상품 정보를 불러오는 중입니다...
-      </div>
-      <div v-else-if="loadError" class="rounded-xl bg-white p-5 text-sm text-red-500 shadow-sm">
-        {{ loadError }}
-      </div>
-      <div v-else class="overflow-hidden rounded-xl bg-white shadow-sm">
-        <img
-          v-if="activeProduct?.imagePath"
-          :src="activeProduct.imagePath"
-          :alt="`${activeProduct.label} 상품 이미지`"
-          class="h-[600px] w-full object-cover"
-        />
-        <div v-else class="flex h-[600px] items-center justify-center text-sm text-gray-500">
-          이미지가 준비되지 않았습니다.
+      <!-- 로딩 -->
+      <div v-if="isLoading" class="gm-loading-overlay">
+        <div class="gm-loading-box">
+          <div class="gm-loading-logo">고마마</div>
+
+          <h2 class="gm-loading-title">상품 정보를 불러오는 중입니다</h2>
+
+          <p class="gm-loading-text">신선한 참외 상품을 준비하고 있어요.</p>
+
+          <div class="gm-loading-spinner"></div>
         </div>
       </div>
 
-      <div v-if="!isLoading && !loadError" class="bg-white p-3">
-        <label class="mb-3 flex items-center gap-2 text-sm font-medium text-gray-700">
-          <input v-model="isMember" type="checkbox" class="h-4 w-4" />
-          <span>회원가 적용</span>
-        </label>
+      <!-- 에러 -->
+      <div v-else-if="loadError" class="gm-section gm-mt-16">
+        <div class="gm-notice gm-notice-danger">
+          <span class="gm-notice-icon">!</span>
 
-        <div class="flex flex-col gap-3">
-          <label
-            v-for="product in products"
-            :key="`checkbox-${product.key}`"
-            class="rounded-lg border border-gray-200 p-3"
-          >
-            <div class="mb-2 flex items-center justify-between">
-              <div class="flex items-center gap-2 text-sm text-gray-800">
+          <div class="gm-notice-content">
+            <strong class="gm-notice-title">상품 로딩 실패</strong>
+            <p class="gm-notice-text">
+              {{ loadError }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <template v-else>
+        <!-- 상품 이미지 헤더 -->
+        <div class="gm-product-hero">
+          <div class="gm-product-image-wrap">
+            <img
+              v-if="activeProduct?.imagePath"
+              :src="activeProduct.imagePath"
+              :alt="`${activeProduct.label} 상품 이미지`"
+              class="gm-product-image"
+            />
+
+            <div
+              v-else
+              class="flex h-full w-full items-center justify-center text-sm font-bold text-gray-500"
+            >
+              이미지가 준비되지 않았습니다.
+            </div>
+
+            <div class="gm-product-image-badges">
+              <span class="gm-badge gm-badge-primary">오늘 수확</span>
+              <span class="gm-badge gm-badge-soft">정품 선별</span>
+            </div>
+          </div>
+
+          <div class="gm-product-hero-body">
+            <span class="gm-product-kicker">고마마정품</span>
+
+            <h1 class="gm-product-title">
+              {{ productName }}
+            </h1>
+
+            <p class="gm-product-subtitle">
+              성주 농가에서 직접 선별한 신선한 참외를 산지에서 바로 보내드립니다.
+            </p>
+
+            <div class="gm-product-price-row">
+              <strong class="gm-product-price">
+                {{
+                  activeProduct
+                    ? formatPrice(isMember ? activeProduct.memberPrice : activeProduct.guestPrice)
+                    : 0
+                }}원
+                <span class="gm-product-price-unit">부터</span>
+              </strong>
+
+              <span class="gm-product-origin"> 경북 성주 </span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height: 18px"></div>
+
+        <!-- 회원 상태 안내 -->
+        <div class="gm-section">
+          <div class="gm-notice" :class="isMember ? 'gm-notice-success' : 'gm-notice-info'">
+            <span class="gm-notice-icon">
+              {{ isMember ? '✓' : 'i' }}
+            </span>
+
+            <div class="gm-notice-content">
+              <strong class="gm-notice-title">
+                {{ isMember ? '회원가 적용 안내' : '비회원 주문 안내' }}
+              </strong>
+              <p class="gm-notice-text">
+                {{ memberStatusMessage }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 상품 옵션 선택 -->
+        <div class="gm-section">
+          <div class="gm-card">
+            <h3 class="gm-card-title">상품 옵션 선택</h3>
+
+            <p class="gm-card-text gm-card-muted gm-mb-16">
+              주문하실 참외 옵션을 선택해 주세요. 여러 옵션을 함께 선택할 수 있어요.
+            </p>
+
+            <div class="gm-option-list">
+              <label
+                v-for="product in products"
+                :key="`option-${product.key}`"
+                class="gm-option-card"
+              >
                 <input
                   v-model="selectedWeights"
                   type="checkbox"
                   :value="product.key"
-                  class="h-4 w-4"
+                  @change="activeTab = product.key"
                 />
-                <span class="font-semibold">{{ product.label }}</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <button
-                  type="button"
-                  class="h-7 w-7 rounded-md border border-gray-300 text-base text-gray-700"
-                  @click.prevent="decreaseQuantity(product.key)"
-                >
-                  -
-                </button>
-                <span class="w-6 text-center text-sm font-medium text-gray-800">
-                  {{ quantities[product.key] }}
+
+                <span class="gm-option-card-body">
+                  <span class="flex items-start justify-between gap-3">
+                    <span>
+                      <span class="gm-option-title">
+                        {{ product.label }}
+                      </span>
+
+                      <span class="gm-option-desc">
+                        비회원가 {{ formatPrice(product.guestPrice) }}원
+                      </span>
+
+                      <span class="gm-option-price">
+                        고정고객 {{ formatPrice(product.memberPrice) }}원
+                      </span>
+                    </span>
+
+                    <span
+                      v-if="selectedWeights.includes(product.key)"
+                      class="gm-badge gm-badge-primary"
+                    >
+                      선택됨
+                    </span>
+                  </span>
+
+                  <div
+                    v-if="selectedWeights.includes(product.key)"
+                    class="gm-card gm-card-soft gm-mt-16"
+                  >
+                    <div class="gm-qty-row">
+                      <div class="gm-qty-info">
+                        <span class="gm-qty-title">수량</span>
+                        <span class="gm-qty-desc"> {{ product.label }} 주문 수량 </span>
+                      </div>
+
+                      <div class="gm-qty">
+                        <button
+                          type="button"
+                          class="gm-qty-button"
+                          :disabled="(quantities[product.key] ?? 1) <= 1"
+                          @click.prevent="decreaseQuantity(product.key)"
+                        >
+                          -
+                        </button>
+
+                        <span class="gm-qty-value">
+                          {{ quantities[product.key] ?? 1 }}
+                        </span>
+
+                        <button
+                          type="button"
+                          class="gm-qty-button"
+                          @click.prevent="increaseQuantity(product.key)"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </span>
-                <button
-                  type="button"
-                  class="h-7 w-7 rounded-md border border-gray-300 text-base text-gray-700"
-                  @click.prevent="increaseQuantity(product.key)"
-                >
-                  +
-                </button>
-              </div>
+              </label>
             </div>
-            <div class="space-y-1 pl-6 text-sm">
-              <p class="text-gray-600">비회원가 {{ formatPrice(product.guestPrice) }}원</p>
-              <p class="font-medium text-green-600">
-                회원가 {{ formatPrice(product.memberPrice) }}원
-              </p>
-            </div>
-          </label>
+          </div>
         </div>
 
-        <div class="mt-4 rounded-xl bg-gray-50 p-4">
-          <p class="text-base font-semibold text-gray-800">
-            총 금액 {{ formatPrice(totalPrice) }}원
-          </p>
-          <button
-            type="button"
-            class="mt-3 w-full rounded-lg bg-green-600 px-4 py-3 text-sm font-semibold text-white"
-            @click="moveToLandingCheckout"
-          >
-            주문하기 &gt;
-          </button>
+        <!-- 주문 요약 -->
+        <div class="gm-section">
+          <div class="gm-card">
+            <h3 class="gm-card-title">주문 요약</h3>
+
+            <p class="gm-card-text gm-card-muted gm-mb-16">
+              선택한 옵션과 총 금액을 확인해 주세요.
+            </p>
+
+            <div v-if="selectedProducts.length > 0" class="gm-summary">
+              <div
+                v-for="product in selectedProducts"
+                :key="`summary-${product.key}`"
+                class="gm-summary-row"
+              >
+                <span class="gm-summary-label">
+                  {{ product.label }} × {{ quantities[product.key] ?? 1 }}박스
+                </span>
+
+                <span class="gm-summary-value">
+                  {{
+                    formatPrice(
+                      (isMember ? product.memberPrice : product.guestPrice) *
+                        (quantities[product.key] ?? 1),
+                    )
+                  }}원
+                </span>
+              </div>
+
+              <div class="gm-summary-divider"></div>
+
+              <div class="gm-summary-row gm-summary-total">
+                <span class="gm-summary-label">총 금액</span>
+                <span class="gm-summary-value"> {{ formatPrice(totalPrice) }}원 </span>
+              </div>
+
+              <span class="gm-summary-small"> 다음 단계에서 배송지와 결제 정보를 입력합니다. </span>
+            </div>
+
+            <div v-else class="gm-history-empty">
+              <h4 class="gm-history-empty-title">선택된 옵션이 없어요</h4>
+
+              <p class="gm-history-empty-text">주문할 참외 옵션을 1개 이상 선택해 주세요.</p>
+            </div>
+          </div>
         </div>
-      </div>
+
+        <!-- 하단 버튼 공간 확보 -->
+        <div class="gm-bottom-spacer"></div>
+
+        <!-- 하단 고정 주문 버튼 -->
+        <div class="gm-bottom-action">
+          <div class="gm-bottom-action-inner">
+            <div class="gm-bottom-action-row">
+              <div class="gm-bottom-action-price">
+                <span class="gm-bottom-action-label">
+                  {{ bottomActionLabel }}
+                </span>
+
+                <strong class="gm-bottom-action-amount"> {{ formatPrice(totalPrice) }}원 </strong>
+              </div>
+
+              <button
+                type="button"
+                class="gm-button gm-button-lg gm-button-pill gm-button-primary"
+                :disabled="!selectedWeights.length"
+                @click="moveToLandingCheckout"
+              >
+                주문하기
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>
