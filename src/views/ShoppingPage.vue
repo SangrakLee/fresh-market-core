@@ -1,8 +1,9 @@
 <script setup>
-import { Citrus } from 'lucide-vue-next'
 import { computed, nextTick, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
+import BaseFullOverlay from '@/components/overlays/BaseFullOverlay.vue'
+import CheckoutOverlayContent from '@/features/checkout/components/CheckoutOverlayContent.vue'
+import AddressSearchOverlayContent from '@/features/address/components/AddressSearchOverlayContent.vue'
 const detailImageModules = import.meta.glob('../assets/images/detail-img/*.{jpg,jpeg,png,webp}', {
   eager: true,
   import: 'default',
@@ -54,8 +55,13 @@ const quantities = ref({})
 const memberType = ref('비회원')
 const customerName = ref('고객')
 const productName = ref('참외')
-const router = useRouter()
 const isMember = computed(() => memberType.value !== '비회원')
+const isCheckoutOpen = ref(false)
+const checkoutOrder = ref(null)
+const selectedZonecode = ref('')
+const selectedBaseAddress = ref('')
+const isAddressSearchOpen = ref(false)
+const isSubmittingOrder = ref(false)
 
 const memberStatusMessage = computed(() => {
   if (!isMember.value) {
@@ -225,7 +231,7 @@ onMounted(async () => {
   }
 })
 
-const moveToLandingCheckout = () => {
+const openCheckoutOverlay = () => {
   if (!selectedWeights.value.length) {
     alert('옵션을 1개 이상 선택해 주세요.')
     return
@@ -243,18 +249,112 @@ const moveToLandingCheckout = () => {
     .map((product) => `${product.label} ${quantities.value[product.key] ?? 1}개`)
     .join(', ')
 
-  router.push({
-    path: '/',
-    query: {
-      reorder: '1',
-      product_id: '0',
-      product_name: productName.value,
-      option_id: '0',
-      option_name: optionSummary,
-      quantity: String(totalQuantity),
-      total_amount: String(totalPrice.value),
+  checkoutOrder.value = {
+    product_id: 0,
+    product_name: productName.value,
+    option_id: 0,
+    option_name: optionSummary,
+    quantity: totalQuantity,
+    total_amount: totalPrice.value,
+    recipient_name: '',
+    recipient_phone: '',
+    recipient_address: '',
+    recipient_detail_address: '',
+    saved_full_address: '',
+    recipient_zonecode: '',
+    recipient_base_address: '',
+    delivery_message: '',
+  }
+
+  selectedZonecode.value = ''
+  selectedBaseAddress.value = ''
+  isCheckoutOpen.value = true
+}
+
+function handleSelectAddress(addressItem) {
+  selectedZonecode.value = addressItem.zonecode
+  selectedBaseAddress.value = addressItem.address
+  isAddressSearchOpen.value = false
+}
+
+const generateOrderCode = () => {
+  return `gomama_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+const tossClientKey = import.meta.env.VITE_TOSS_CLIENT_KEY
+const openTossPayment = async ({ orderCode, amount, orderName, customerName }) => {
+  try {
+    if (typeof window.TossPayments !== 'function') {
+      throw new Error('TossPayments SDK가 로드되지 않았습니다.')
+    }
+
+    const tossPayments = window.TossPayments(tossClientKey)
+    const payment = tossPayments.payment({
+      customerKey: 'guest',
+    })
+    await payment.requestPayment({
+      method: 'CARD',
+      amount: {
+        currency: 'KRW',
+        value: amount,
+      },
+      orderId: orderCode,
+      orderName,
+      customerName,
+      successUrl: `${window.location.origin}/payment/success`,
+      failUrl: `${window.location.origin}/payment/fail`,
+    })
+  } catch (error) {
+    console.error('토스 결제창 호출 에러:', error)
+    alert('결제창을 여는 중 문제가 발생했습니다.')
+  }
+}
+
+async function handleConfirmOrder(checkoutPayload) {
+  if (isSubmittingOrder.value) return
+  isSubmittingOrder.value = true
+
+  const { data: sessionData } = await supabase.auth.getSession()
+  const user = sessionData.session?.user || null
+  const orderCode = generateOrderCode()
+
+  const { error } = await supabase.from('orders').insert([
+    {
+      product_id: checkoutPayload.product_id,
+      product_name: checkoutPayload.product_name,
+      option_id: checkoutPayload.option_id,
+      option_name: checkoutPayload.option_name,
+      quantity: checkoutPayload.quantity,
+      total_amount: checkoutPayload.total_amount,
+      recipient_name: checkoutPayload.recipient_name,
+      recipient_phone: checkoutPayload.recipient_phone,
+      recipient_address: checkoutPayload.recipient_address,
+      recipient_zonecode: checkoutPayload.recipient_zonecode || '',
+      recipient_base_address: checkoutPayload.recipient_base_address || '',
+      recipient_detail_address: checkoutPayload.recipient_detail_address || '',
+      delivery_message: checkoutPayload.delivery_message,
+      user_id: user?.id || null,
+      order_code: orderCode,
+      order_status: 'pending',
     },
+  ])
+
+  if (error) {
+    alert('주문 저장 중 문제가 발생했습니다')
+    isSubmittingOrder.value = false
+    return
+  }
+
+  isCheckoutOpen.value = false
+
+  await openTossPayment({
+    orderCode,
+    amount: checkoutPayload.total_amount,
+    orderName: `${checkoutPayload.product_name} ${checkoutPayload.option_name}`,
+    customerName: checkoutPayload.recipient_name,
   })
+
+  isSubmittingOrder.value = false
 }
 </script>
 
@@ -531,7 +631,7 @@ const moveToLandingCheckout = () => {
                 type="button"
                 class="gm-button gm-button-lg gm-button-pill gm-button-primary"
                 :disabled="!selectedWeights.length"
-                @click="moveToLandingCheckout"
+                @click="openCheckoutOverlay"
               >
                 주문하기
               </button>
@@ -539,6 +639,21 @@ const moveToLandingCheckout = () => {
           </div>
         </div>
       </template>
+      <BaseFullOverlay v-model="isCheckoutOpen">
+        <CheckoutOverlayContent
+          v-if="checkoutOrder"
+          :order="checkoutOrder"
+          :is-submitting="isSubmittingOrder"
+          :zonecode="selectedZonecode"
+          :base-address="selectedBaseAddress"
+          @open-address-search="isAddressSearchOpen = true"
+          @confirm-order="handleConfirmOrder"
+        />
+      </BaseFullOverlay>
+
+      <BaseFullOverlay v-model="isAddressSearchOpen">
+        <AddressSearchOverlayContent @select-address="handleSelectAddress" />
+      </BaseFullOverlay>
     </div>
   </div>
 </template>

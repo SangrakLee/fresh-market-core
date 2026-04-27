@@ -8,7 +8,6 @@ const router = useRouter()
 const session = ref(null)
 const authUserLabel = ref('')
 const memberType = ref('비회원')
-const relationStatus = ref('')
 
 const resolveMemberType = (hasSession) => {
   if (!hasSession) return '비회원'
@@ -17,7 +16,27 @@ const resolveMemberType = (hasSession) => {
   return '회원'
 }
 
-const getKakaoTargetId = async (providerToken) => {
+const getKakaoTargetIdFromSession = (currentSession) => {
+  const user = currentSession?.user
+  const metadataProviderId =
+    user?.user_metadata?.provider_id || user?.user_metadata?.id || user?.user_metadata?.sub
+  if (metadataProviderId) return String(metadataProviderId)
+
+  const kakaoIdentity = user?.identities?.find((identity) => identity.provider === 'kakao')
+  const identityProviderId =
+    kakaoIdentity?.identity_data?.provider_id ||
+    kakaoIdentity?.identity_data?.id ||
+    kakaoIdentity?.identity_data?.sub
+  if (identityProviderId) return String(identityProviderId)
+
+  return null
+}
+
+const getKakaoTargetId = async (currentSession) => {
+  const targetIdFromSession = getKakaoTargetIdFromSession(currentSession)
+  if (targetIdFromSession) return targetIdFromSession
+
+  const providerToken = currentSession?.provider_token
   if (!providerToken) return null
 
   const meResponse = await fetch('https://kapi.kakao.com/v2/user/me', {
@@ -36,8 +55,7 @@ const getKakaoTargetId = async (providerToken) => {
 }
 
 const fetchMemberTypeFromKakaoRelation = async (currentSession) => {
-  const providerToken = currentSession?.provider_token
-  const targetId = await getKakaoTargetId(providerToken)
+  const targetId = await getKakaoTargetId(currentSession)
   if (!targetId) return
 
   const { data, error } = await supabase.functions.invoke('check-kakao-channel-relation', {
@@ -50,8 +68,11 @@ const fetchMemberTypeFromKakaoRelation = async (currentSession) => {
 
   if (data?.memberType) {
     memberType.value = data.memberType
-    relationStatus.value = Array.isArray(data.relations) ? data.relations.join(', ') : ''
+    return
   }
+
+  const relations = Array.isArray(data?.relations) ? data.relations : []
+  memberType.value = relations.includes('ADDED') ? '고정고객' : '회원'
 }
 
 const signInWithKakao = async () => {
@@ -82,7 +103,6 @@ const signOut = async () => {
   session.value = null
   authUserLabel.value = ''
   memberType.value = resolveMemberType(false)
-  relationStatus.value = ''
   router.push('/')
 }
 
@@ -115,9 +135,6 @@ onMounted(async () => {
           <div class="mt-2 text-sm text-gray-700">
             회원 구분:
             <span class="font-semibold text-gray-900">{{ memberType }}</span>
-          </div>
-          <div v-if="relationStatus" class="mt-1 text-xs text-gray-500">
-            카카오 채널 관계: {{ relationStatus }}
           </div>
 
           <div class="mt-4 space-y-3">
