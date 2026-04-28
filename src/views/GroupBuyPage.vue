@@ -340,7 +340,9 @@ const createGroupBuy = async () => {
 }
 
 const deleteGroupBuy = async (groupBuyId) => {
-  const confirmed = window.confirm('이 공동구매를 삭제할까요? 관련 링크/멤버 정보도 함께 삭제됩니다.')
+  const confirmed = window.confirm(
+    '이 공동구매를 삭제할까요? 관련 링크/멤버 정보도 함께 삭제됩니다.',
+  )
   if (!confirmed) return
 
   groupBuyError.value = ''
@@ -514,9 +516,7 @@ onMounted(async () => {
             더 저렴해요
           </h1>
 
-          <p class="gm-card-text">
-            상품과 수량만 정하면 친구에게 보낼 링크가 자동으로 만들어져요.
-          </p>
+          <p class="gm-card-text">상품과 수량만 정하면 친구에게 보낼 링크가 자동으로 만들어져요.</p>
 
           <button
             type="button"
@@ -656,34 +656,33 @@ onMounted(async () => {
 
           <div class="gm-overlay-body">
             <div v-if="groupBuyStep === 1">
-              <div class="gm-notice gm-notice-info gm-mb-16">
-                <span class="gm-notice-icon">1</span>
-                <div class="gm-notice-content">
-                  <strong class="gm-notice-title">어떤 참외로 공동구매할까요?</strong>
-                  <p class="gm-notice-text">공동구매할 상품 옵션을 먼저 선택해 주세요.</p>
+              <div class="gm-card gm-card-soft gm-mb-16">
+                <div class="flex items-center justify-between gap-3">
+                  <strong class="gm-qty-title">상품 옵션 선택</strong>
+                  <span class="text-sm font-bold text-rose-500">필수 선택</span>
                 </div>
               </div>
 
-              <div class="gm-option-list">
-                <label v-for="option in options" :key="option.id" class="gm-option-card">
-                  <input v-model="selectedOptionId" type="radio" :value="option.id" />
-
-                  <span class="gm-option-card-body">
-                    <span class="flex items-start justify-between gap-3">
-                      <span>
-                        <span class="gm-option-title">
-                          {{ product?.name || '고마마정품' }} {{ option.name }}
-                        </span>
-                        <span class="gm-option-desc">기본가 {{ formatCurrency(option.price) }}</span>
-                        <span class="gm-option-price">
-                          공동구매가 {{ formatCurrency(Math.max(option.price - totalDiscountPerItem, 0)) }}
-                        </span>
-                      </span>
-
-                      <span v-if="selectedOptionId === option.id" class="gm-badge gm-badge-primary">
-                        선택됨
-                      </span>
+              <div class="gm-option-list space-y-2">
+                <label
+                  v-for="option in options"
+                  :key="option.id"
+                  class="gm-option-card flex items-center justify-between gap-3 p-4"
+                >
+                  <span class="flex min-w-0 items-center gap-3">
+                    <input
+                      v-model="selectedOptionId"
+                      type="radio"
+                      :value="option.id"
+                      class="h-5 w-5"
+                    />
+                    <span class="truncate text-base font-semibold text-gray-900">
+                      {{ product?.name || '고마마정품' }} {{ option.name }}
                     </span>
+                  </span>
+
+                  <span class="shrink-0 text-sm font-extrabold text-gray-700">
+                    {{ formatCurrency(Math.max(option.price - totalDiscountPerItem, 0)) }}
                   </span>
                 </label>
               </div>
@@ -715,7 +714,9 @@ onMounted(async () => {
                       -
                     </button>
                     <span class="gm-qty-value">{{ totalQuantity }}</span>
-                    <button type="button" class="gm-qty-button" @click="increaseTotalQuantity">+</button>
+                    <button type="button" class="gm-qty-button" @click="increaseTotalQuantity">
+                      +
+                    </button>
                   </div>
                 </div>
               </div>
@@ -784,7 +785,9 @@ onMounted(async () => {
                 <span class="gm-notice-icon">4</span>
                 <div class="gm-notice-content">
                   <strong class="gm-notice-title">공동구매 내용을 확인해 주세요</strong>
-                  <p class="gm-notice-text">아래 내용으로 공동구매를 만들고 초대 링크를 생성합니다.</p>
+                  <p class="gm-notice-text">
+                    아래 내용으로 공동구매를 만들고 초대 링크를 생성합니다.
+                  </p>
                 </div>
               </div>
 
@@ -875,7 +878,9 @@ onMounted(async () => {
                 <span class="gm-notice-icon">i</span>
                 <div class="gm-notice-content">
                   <strong class="gm-notice-title">링크 공유는 내 공동구매에서</strong>
-                  <p class="gm-notice-text">오버레이를 닫고 [링크 공유] 버튼을 눌러 보내면 됩니다.</p>
+                  <p class="gm-notice-text">
+                    오버레이를 닫고 [링크 공유] 버튼을 눌러 보내면 됩니다.
+                  </p>
                 </div>
               </div>
             </div>
@@ -944,7 +949,9 @@ onMounted(async () => {
                 </div>
                 <div class="gm-summary-row">
                   <span class="gm-summary-label">옵션</span>
-                  <span class="gm-summary-value">{{ selectedGroup.product_options?.name || '-' }}</span>
+                  <span class="gm-summary-value">{{
+                    selectedGroup.product_options?.name || '-'
+                  }}</span>
                 </div>
                 <div class="gm-summary-row">
                   <span class="gm-summary-label">총 수량</span>
