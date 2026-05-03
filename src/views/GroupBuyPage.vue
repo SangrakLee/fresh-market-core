@@ -2,6 +2,7 @@
 /* global TossPayments */
 import { computed, onMounted, ref } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { RefreshCcw, Trash2 } from 'lucide-vue-next'
 
 const product = ref(null)
 const options = ref([])
@@ -21,7 +22,7 @@ const myGroupBuys = ref([])
 const isGroupBuySheetOpen = ref(false)
 const groupBuyStep = ref(1)
 const selectedGroup = ref(null)
-const copiedMemberId = ref(null)
+// const copiedMemberId = ref(null)
 
 const totalQuantity = ref(2)
 const hostQuantity = ref(1)
@@ -159,12 +160,12 @@ const prevGroupBuyStep = () => {
 
 const openGroupDetail = (group) => {
   selectedGroup.value = group
-  copiedMemberId.value = null
+  // copiedMemberId.value = null
 }
 
 const closeGroupDetail = () => {
   selectedGroup.value = null
-  copiedMemberId.value = null
+  // copiedMemberId.value = null
 }
 
 const generateInviteToken = () => {
@@ -207,26 +208,26 @@ const shareOneInviteLink = async (inviteToken) => {
   alert('공유 문구를 복사했어요. 카카오톡에 붙여넣어 보내면 됩니다.')
 }
 
-const copyMemberLink = async (inviteToken) => {
-  await navigator.clipboard.writeText(buildInviteUrl(inviteToken))
-}
+// const copyMemberLink = async (inviteToken) => {
+//   await navigator.clipboard.writeText(buildInviteUrl(inviteToken))
+// }
 
-const copyInviteLinkWithFeedback = async (member) => {
-  if (!member?.invite_token) return
+// const copyInviteLinkWithFeedback = async (member) => {
+//   if (!member?.invite_token) return
 
-  try {
-    await copyMemberLink(member.invite_token)
-    copiedMemberId.value = member.id
+//   try {
+//     await copyMemberLink(member.invite_token)
+//     copiedMemberId.value = member.id
 
-    setTimeout(() => {
-      if (copiedMemberId.value === member.id) {
-        copiedMemberId.value = null
-      }
-    }, 1500)
-  } catch {
-    alert('링크 복사에 실패했어요.')
-  }
-}
+//     setTimeout(() => {
+//       if (copiedMemberId.value === member.id) {
+//         copiedMemberId.value = null
+//       }
+//     }, 1500)
+//   } catch {
+//     alert('링크 복사에 실패했어요.')
+//   }
+// }
 
 const loadMyGroupBuys = async () => {
   isLoadingMyGroupBuys.value = true
@@ -568,80 +569,71 @@ onMounted(async () => {
       </section>
 
       <section class="gm-section">
-        <div class="gm-card">
-          <div class="flex items-start justify-between gap-3">
+        <div
+          class="overflow-hidden rounded-3xl border border-[#20242e] bg-[#0b0f15] text-white shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
+        >
+          <div class="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
             <div>
-              <h2 class="gm-card-title">내 공동구매</h2>
-              <p class="gm-card-text gm-card-muted">링크 공유와 결제 상태를 확인하세요.</p>
+              <h2 class="text-lg font-bold tracking-tight">내 공동구매</h2>
+              <p class="mt-1 text-sm text-white/60">링크 공유와 결제 상태를 확인하세요.</p>
             </div>
 
             <button
               type="button"
-              class="shrink-0 text-xs font-extrabold text-gray-400"
+              class="shrink-0 rounded-full border border-white/20 px-3 py-1 text-xs font-bold text-white/80 transition hover:bg-white/10"
               @click="loadMyGroupBuys"
             >
-              새로고침
+              <RefreshCcw size="16" />
             </button>
           </div>
 
-          <div v-if="isLoadingMyGroupBuys" class="gm-history-empty gm-mt-16">
-            <h4 class="gm-history-empty-title">불러오는 중...</h4>
-            <p class="gm-history-empty-text">내 공동구매 목록을 확인하고 있어요.</p>
+          <div v-if="isLoadingMyGroupBuys" class="px-5 py-7 text-center text-sm text-white/70">
+            내 공동구매 목록을 확인하고 있어요.
           </div>
 
-          <div v-else-if="!myGroupBuys.length" class="gm-history-empty gm-mt-16">
-            <h4 class="gm-history-empty-title">아직 공동구매가 없어요</h4>
-            <p class="gm-history-empty-text">공동구매를 만들면 이곳에 표시됩니다.</p>
+          <div v-else-if="!myGroupBuys.length" class="px-5 py-7 text-center">
+            <h4 class="text-base font-semibold text-white">아직 공동구매가 없어요</h4>
+            <p class="mt-1 text-sm text-white/60">공동구매를 만들면 이곳에 표시됩니다.</p>
           </div>
 
-          <div v-else class="gm-history-list gm-mt-16">
-            <article v-for="group in myGroupBuys" :key="group.id" class="gm-history-card">
-              <div class="gm-history-head">
-                <div>
-                  <strong class="gm-history-title">
-                    {{ group.products?.name || '-' }} / {{ group.product_options?.name || '-' }}
-                  </strong>
-                  <span class="gm-history-date">{{ formatDateTime(group.created_at) }}</span>
+          <div v-else class="divide-y divide-white/10">
+            <article v-for="group in myGroupBuys" :key="group.id" class="px-5 py-4">
+              <button type="button" class="w-full text-left" @click="openGroupDetail(group)">
+                <div class="flex items-start gap-3">
+                  <span class="mt-1 text-sm">⭐</span>
+                  <div class="min-w-0 flex-1">
+                    <strong class="block truncate text-base font-bold text-white">
+                      {{ group.products?.name || '-' }} / {{ group.product_options?.name || '-' }}
+                    </strong>
+                    <span class="mt-1 block text-sm text-white/65">
+                      {{ group.total_quantity }}박스 · 내 결제 {{ group.host_quantity }}박스 · 링크
+                      {{ group.share_slot_count }}개
+                    </span>
+                    <span class="mt-1 block text-xs text-white/45">{{
+                      formatDateTime(group.created_at)
+                    }}</span>
+                  </div>
+                  <div class="ml-2 flex flex-col items-end gap-2">
+                    <span
+                      class="rounded-md bg-blue-500 px-2 py-1 text-[10px] font-black text-white"
+                    >
+                      {{ group.status }}
+                    </span>
+                    <span class="text-white/60">›</span>
+                  </div>
                 </div>
+              </button>
 
-                <span class="gm-history-status">{{ group.status }}</span>
-              </div>
+              <button
+                type="button"
+                class="mt-3 flex items-center gap-1 text-xs font-semibold text-rose-300 hover:text-rose-400"
+                :disabled="deletingGroupBuyId === group.id"
+                @click="deleteGroupBuy(group.id)"
+              >
+                <Trash2 size="16" />
 
-              <div class="gm-history-body">
-                <div class="gm-history-row">
-                  <span class="gm-history-label">총 수량</span>
-                  <span class="gm-history-value">{{ group.total_quantity }}박스</span>
-                </div>
-
-                <div class="gm-history-row">
-                  <span class="gm-history-label">내 결제</span>
-                  <span class="gm-history-value">{{ group.host_quantity }}박스</span>
-                </div>
-
-                <div class="gm-history-row">
-                  <span class="gm-history-label">초대 링크</span>
-                  <span class="gm-history-value">{{ group.share_slot_count }}개</span>
-                </div>
-              </div>
-
-              <div class="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  class="gm-button gm-button-sm gm-button-pill gm-button-primary"
-                  @click="openGroupDetail(group)"
-                >
-                  링크 공유
-                </button>
-
-                <button
-                  type="button"
-                  class="gm-button gm-button-sm gm-button-pill gm-button-outline"
-                  :disabled="deletingGroupBuyId === group.id"
-                  @click="deleteGroupBuy(group.id)"
-                >
-                  {{ deletingGroupBuyId === group.id ? '삭제 중...' : '삭제' }}
-                </button>
-              </div>
+                {{ deletingGroupBuyId === group.id ? '삭제 중...' : '삭제' }}
+              </button>
             </article>
           </div>
         </div>
@@ -1008,31 +1000,29 @@ onMounted(async () => {
                   </template>
 
                   <template v-else-if="member.invite_token">
-                    <div class="gm-notice gm-notice-info gm-mb-16">
-                      <span class="gm-notice-icon">i</span>
-                      <div class="gm-notice-content">
-                        <strong class="gm-notice-title">초대 링크 준비됨</strong>
-                        <p class="gm-notice-text">
-                          링크를 받은 사람은 주소 입력과 결제를 직접 진행합니다.
-                        </p>
+                    <div class="rounded-3xl border border-sky-200 bg-sky-50/80 p-4">
+                      <div class="flex items-center justify-between gap-2">
+                        <strong class="text-sm font-extrabold text-slate-800"
+                          >초대 링크 준비 완료</strong
+                        >
+                        <span
+                          class="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-sky-600"
+                        >
+                          참여자 #{{ member.slot_no }}
+                        </span>
                       </div>
-                    </div>
 
-                    <div class="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        class="gm-button gm-button-md gm-button-pill gm-button-outline"
-                        @click="copyInviteLinkWithFeedback(member)"
-                      >
-                        {{ copiedMemberId === member.id ? '복사 완료!' : '링크 복사' }}
-                      </button>
+                      <p class="mt-2 text-xs font-semibold leading-relaxed text-slate-500">
+                        아래 버튼으로 공유하면 상대방이 주소 입력과 결제를 바로 진행할 수 있어요.
+                      </p>
 
                       <button
                         type="button"
-                        class="gm-button gm-button-md gm-button-pill gm-button-primary"
+                        class="mt-3 flex w-full items-center justify-between rounded-2xl border border-sky-200 bg-white px-4 py-3 text-left"
                         @click="shareOneInviteLink(member.invite_token)"
                       >
-                        바로 공유
+                        <span class="text-sm font-extrabold text-sky-600">친구에게 공유하기</span>
+                        <span class="text-xl leading-none text-sky-500">›</span>
                       </button>
                     </div>
                   </template>
