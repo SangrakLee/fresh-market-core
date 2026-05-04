@@ -503,554 +503,506 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#f7f8f9] pb-10 pt-5 text-black">
-    <div class="mx-auto w-full max-w-[430px]">
-      <section class="gm-section">
-        <div class="gm-card gm-card-gradient-green">
-          <div class="gm-mb-16 flex items-center justify-between gap-3">
-            <span class="gm-badge gm-badge-white">고마마 공동구매</span>
-            <span class="gm-badge gm-badge-white">개별 결제</span>
+  <button
+    type="button"
+    class="gm-button gm-button-full gm-button-lg gm-button-pill gm-button-white gm-mt-16"
+    :disabled="isLoading || !!loadError"
+    @click="openGroupBuySheet"
+  >
+    공동구매 시작하기
+  </button>
+
+  <section class="gm-section">
+    <div class="gm-notice" :class="isKakaoFriend ? 'gm-notice-success' : 'gm-notice-info'">
+      <span class="gm-notice-icon">{{ isKakaoFriend ? '✓' : 'i' }}</span>
+
+      <div class="gm-notice-content">
+        <strong class="gm-notice-title">공동구매 할인 안내</strong>
+        <p class="gm-notice-text">{{ discountLabel }}</p>
+        <p class="gm-notice-text mt-1">
+          {{
+            isKakaoFriend
+              ? '카카오 친구 추가 할인도 적용돼요.'
+              : '로그인하면 카카오 친구 할인을 확인할 수 있어요.'
+          }}
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section v-if="isLoading" class="gm-section">
+    <div class="gm-notice gm-notice-info">
+      <span class="gm-notice-icon">i</span>
+      <div class="gm-notice-content">
+        <strong class="gm-notice-title">불러오는 중</strong>
+        <p class="gm-notice-text">공동구매 상품 정보를 불러오고 있어요.</p>
+      </div>
+    </div>
+  </section>
+
+  <section v-if="loadError" class="gm-section">
+    <div class="gm-notice gm-notice-danger">
+      <span class="gm-notice-icon">!</span>
+      <div class="gm-notice-content">
+        <strong class="gm-notice-title">로딩 실패</strong>
+        <p class="gm-notice-text">{{ loadError }}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="gm-section">
+    <div
+      class="overflow-hidden rounded-3xl border border-[#20242e] bg-[#0b0f15] text-white shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
+    >
+      <div class="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
+        <div>
+          <h2 class="text-lg font-bold tracking-tight">내 공동구매</h2>
+          <p class="mt-1 text-sm text-white/60">링크 공유와 결제 상태를 확인하세요.</p>
+        </div>
+
+        <button
+          type="button"
+          class="shrink-0 rounded-full border border-white/20 px-3 py-1 text-xs font-bold text-white/80 transition hover:bg-white/10"
+          @click="loadMyGroupBuys"
+        >
+          <RefreshCcw size="16" />
+        </button>
+      </div>
+
+      <div v-if="isLoadingMyGroupBuys" class="px-5 py-7 text-center text-sm text-white/70">
+        내 공동구매 목록을 확인하고 있어요.
+      </div>
+
+      <div v-else-if="!myGroupBuys.length" class="px-5 py-7 text-center">
+        <h4 class="text-base font-semibold text-white">아직 공동구매가 없어요</h4>
+        <p class="mt-1 text-sm text-white/60">공동구매를 만들면 이곳에 표시됩니다.</p>
+      </div>
+
+      <article v-for="group in myGroupBuys" :key="group.id" class="px-5 py-4">
+        {{ formatDateTime(group.created_at) }} {{ group.status }}
+        <button type="button" class="w-full text-left" @click="openGroupDetail(group)">
+          <div class="min-w-0 flex-1">
+            {{ group.products?.name || '-' }}<br />
+            {{ group.product_options?.name || '-' }}
+            총 주문수 {{ group.share_slot_count }}박스<br />
+            내 결제 {{ group.host_quantity }}박스<br />
+            공동구매자 {{ group.total_quantity }} 박스
+          </div>
+        </button>
+
+        <button
+          type="button"
+          class="mt-3 flex items-center gap-1 text-xs font-semibold text-rose-300 hover:text-rose-400"
+          :disabled="deletingGroupBuyId === group.id"
+          @click="deleteGroupBuy(group.id)"
+        >
+          <Trash2 size="16" />
+
+          {{ deletingGroupBuyId === group.id ? '삭제 중...' : '삭제' }}
+        </button>
+      </article>
+    </div>
+  </section>
+
+  <div v-if="isGroupBuySheetOpen" class="gm-overlay" @click.self="closeGroupBuySheet">
+    <div class="gm-overlay-panel">
+      <div class="gm-overlay-header">
+        <h2 class="gm-overlay-title">{{ sheetTitle }}</h2>
+        <button type="button" class="gm-overlay-close" @click="closeGroupBuySheet">×</button>
+      </div>
+
+      <div class="gm-overlay-body">
+        <div v-if="groupBuyStep === 1">
+          <div class="gm-card gm-card-soft gm-mb-16">
+            <div class="flex items-center justify-between gap-3">
+              <strong class="gm-qty-title">상품 옵션 선택</strong>
+              <span class="text-sm font-bold text-rose-500">필수 선택</span>
+            </div>
           </div>
 
-          <h1 class="gm-card-title">
-            친구와 같이 사면<br />
-            더 저렴해요
-          </h1>
+          <div class="gm-option-list space-y-2">
+            <label
+              v-for="option in options"
+              :key="option.id"
+              class="gm-option-card flex items-center justify-between gap-3 p-4"
+            >
+              <span class="flex min-w-0 items-center gap-3">
+                <input v-model="selectedOptionId" type="radio" :value="option.id" class="h-5 w-5" />
+                <span class="truncate text-base font-semibold text-gray-900">
+                  {{ product?.name || '고마마정품' }} {{ option.name }}
+                </span>
+              </span>
 
-          <p class="gm-card-text">상품과 수량만 정하면 친구에게 보낼 링크가 자동으로 만들어져요.</p>
-
-          <button
-            type="button"
-            class="gm-button gm-button-full gm-button-lg gm-button-pill gm-button-white gm-mt-16"
-            :disabled="isLoading || !!loadError"
-            @click="openGroupBuySheet"
-          >
-            공동구매 시작하기
-          </button>
+              <span class="shrink-0 text-sm font-extrabold text-gray-700">
+                {{ formatCurrency(Math.max(option.price - totalDiscountPerItem, 0)) }}
+              </span>
+            </label>
+          </div>
         </div>
-      </section>
 
-      <section class="gm-section">
-        <div class="gm-notice" :class="isKakaoFriend ? 'gm-notice-success' : 'gm-notice-info'">
-          <span class="gm-notice-icon">{{ isKakaoFriend ? '✓' : 'i' }}</span>
+        <div v-else-if="groupBuyStep === 2">
+          <div class="gm-notice gm-notice-info gm-mb-16">
+            <span class="gm-notice-icon">2</span>
+            <div class="gm-notice-content">
+              <strong class="gm-notice-title">총 몇 박스로 공동구매할까요?</strong>
+              <p class="gm-notice-text">친구들과 함께 주문할 전체 박스 수를 선택해 주세요.</p>
+            </div>
+          </div>
 
-          <div class="gm-notice-content">
-            <strong class="gm-notice-title">공동구매 할인 안내</strong>
-            <p class="gm-notice-text">{{ discountLabel }}</p>
-            <p class="gm-notice-text mt-1">
-              {{
-                isKakaoFriend
-                  ? '카카오 친구 추가 할인도 적용돼요.'
-                  : '로그인하면 카카오 친구 할인을 확인할 수 있어요.'
-              }}
+          <div class="gm-card gm-card-soft">
+            <div class="gm-qty-row">
+              <div class="gm-qty-info">
+                <span class="gm-qty-title">총 공동구매 수량</span>
+                <span class="gm-qty-desc">최소 2박스부터 시작할 수 있어요.</span>
+              </div>
+
+              <div class="gm-qty">
+                <button
+                  type="button"
+                  class="gm-qty-button"
+                  :disabled="totalQuantity <= 2"
+                  @click="decreaseTotalQuantity"
+                >
+                  -
+                </button>
+                <span class="gm-qty-value">{{ totalQuantity }}</span>
+                <button type="button" class="gm-qty-button" @click="increaseTotalQuantity">
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="gm-notice gm-notice-success gm-mt-16">
+            <span class="gm-notice-icon">✓</span>
+            <div class="gm-notice-content">
+              <strong class="gm-notice-title">현재 설정</strong>
+              <p class="gm-notice-text">총 {{ totalQuantity }}박스로 공동구매를 진행합니다.</p>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="groupBuyStep === 3">
+          <div class="gm-notice gm-notice-info gm-mb-16">
+            <span class="gm-notice-icon">3</span>
+            <div class="gm-notice-content">
+              <strong class="gm-notice-title">나는 몇 박스를 결제할까요?</strong>
+              <p class="gm-notice-text">나머지 수량은 친구에게 보낼 링크로 자동 생성돼요.</p>
+            </div>
+          </div>
+
+          <div class="gm-card gm-card-soft">
+            <div class="gm-qty-row">
+              <div class="gm-qty-info">
+                <span class="gm-qty-title">내 결제 수량</span>
+                <span class="gm-qty-desc">내가 직접 결제할 박스 수입니다.</span>
+              </div>
+
+              <div class="gm-qty">
+                <button
+                  type="button"
+                  class="gm-qty-button"
+                  :disabled="hostQuantity <= 1"
+                  @click="decreaseHostQuantity"
+                >
+                  -
+                </button>
+                <span class="gm-qty-value">{{ hostQuantity }}</span>
+                <button
+                  type="button"
+                  class="gm-qty-button"
+                  :disabled="hostQuantity >= totalQuantity"
+                  @click="increaseHostQuantity"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="gm-notice gm-notice-success gm-mt-16">
+            <span class="gm-notice-icon">✓</span>
+            <div class="gm-notice-content">
+              <strong class="gm-notice-title">초대 링크 자동 생성</strong>
+              <p class="gm-notice-text">
+                내가 {{ hostQuantity }}박스를 결제하고, 친구에게 보낼 링크
+                {{ autoShareLinkCount }}개가 생성됩니다.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="groupBuyStep === 4">
+          <div class="gm-notice gm-notice-success gm-mb-16">
+            <span class="gm-notice-icon">4</span>
+            <div class="gm-notice-content">
+              <strong class="gm-notice-title">공동구매 내용을 확인해 주세요</strong>
+              <p class="gm-notice-text">아래 내용으로 공동구매를 만들고 초대 링크를 생성합니다.</p>
+            </div>
+          </div>
+
+          <div class="gm-card gm-card-soft">
+            <div class="gm-summary">
+              <div class="gm-summary-row">
+                <span class="gm-summary-label">상품</span>
+                <span class="gm-summary-value">{{ product?.name || '고마마정품' }}</span>
+              </div>
+              <div class="gm-summary-row">
+                <span class="gm-summary-label">옵션</span>
+                <span class="gm-summary-value">{{ selectedOption?.name || '-' }}</span>
+              </div>
+              <div class="gm-summary-row">
+                <span class="gm-summary-label">총 수량</span>
+                <span class="gm-summary-value">{{ totalQuantity }}박스</span>
+              </div>
+              <div class="gm-summary-row">
+                <span class="gm-summary-label">내 결제 수량</span>
+                <span class="gm-summary-value">{{ hostQuantity }}박스</span>
+              </div>
+              <div class="gm-summary-row">
+                <span class="gm-summary-label">공유 링크</span>
+                <span class="gm-summary-value">{{ autoShareLinkCount }}개</span>
+              </div>
+
+              <div class="gm-summary-divider"></div>
+
+              <div class="gm-summary-row">
+                <span class="gm-summary-label">기본 단가</span>
+                <span class="gm-summary-value">{{ formatCurrency(baseUnitPrice) }}</span>
+              </div>
+              <div class="gm-summary-row">
+                <span class="gm-summary-label">개당 할인</span>
+                <span class="gm-summary-value gm-summary-discount">
+                  - {{ formatCurrency(totalDiscountPerItem) }}
+                </span>
+              </div>
+              <div class="gm-summary-row">
+                <span class="gm-summary-label">공동구매 총액</span>
+                <span class="gm-summary-value">{{ formatCurrency(paymentTotal) }}</span>
+              </div>
+
+              <div class="gm-summary-divider"></div>
+
+              <div class="gm-summary-row gm-summary-total">
+                <span class="gm-summary-label">내 예상 결제금액</span>
+                <span class="gm-summary-value">{{ formatCurrency(hostPaymentTotal) }}</span>
+              </div>
+
+              <span class="gm-summary-small">
+                친구들은 생성된 링크에서 각자 주소 입력과 결제를 진행합니다.
+              </span>
+            </div>
+          </div>
+
+          <div v-if="groupBuyError" class="gm-notice gm-notice-danger gm-mt-16">
+            <span class="gm-notice-icon">!</span>
+            <div class="gm-notice-content">
+              <strong class="gm-notice-title">생성 실패</strong>
+              <p class="gm-notice-text">{{ groupBuyError }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="groupBuyStep === 5">
+          <div class="gm-complete">
+            <div class="gm-complete-icon">✓</div>
+            <h2 class="gm-complete-title">
+              공동구매가<br />
+              만들어졌어요
+            </h2>
+            <p class="gm-complete-text">
+              이제 내 공동구매에서 친구에게<br />
+              초대 링크를 공유하면 됩니다.
             </p>
           </div>
-        </div>
-      </section>
 
-      <section v-if="isLoading" class="gm-section">
-        <div class="gm-notice gm-notice-info">
-          <span class="gm-notice-icon">i</span>
-          <div class="gm-notice-content">
-            <strong class="gm-notice-title">불러오는 중</strong>
-            <p class="gm-notice-text">공동구매 상품 정보를 불러오고 있어요.</p>
-          </div>
-        </div>
-      </section>
-
-      <section v-if="loadError" class="gm-section">
-        <div class="gm-notice gm-notice-danger">
-          <span class="gm-notice-icon">!</span>
-          <div class="gm-notice-content">
-            <strong class="gm-notice-title">로딩 실패</strong>
-            <p class="gm-notice-text">{{ loadError }}</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="gm-section">
-        <div
-          class="overflow-hidden rounded-3xl border border-[#20242e] bg-[#0b0f15] text-white shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
-        >
-          <div class="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
-            <div>
-              <h2 class="text-lg font-bold tracking-tight">내 공동구매</h2>
-              <p class="mt-1 text-sm text-white/60">링크 공유와 결제 상태를 확인하세요.</p>
-            </div>
-
-            <button
-              type="button"
-              class="shrink-0 rounded-full border border-white/20 px-3 py-1 text-xs font-bold text-white/80 transition hover:bg-white/10"
-              @click="loadMyGroupBuys"
-            >
-              <RefreshCcw size="16" />
-            </button>
-          </div>
-
-          <div v-if="isLoadingMyGroupBuys" class="px-5 py-7 text-center text-sm text-white/70">
-            내 공동구매 목록을 확인하고 있어요.
-          </div>
-
-          <div v-else-if="!myGroupBuys.length" class="px-5 py-7 text-center">
-            <h4 class="text-base font-semibold text-white">아직 공동구매가 없어요</h4>
-            <p class="mt-1 text-sm text-white/60">공동구매를 만들면 이곳에 표시됩니다.</p>
-          </div>
-
-          <div v-else class="divide-y divide-white/10">
-            <article v-for="group in myGroupBuys" :key="group.id" class="px-5 py-4">
-              <button type="button" class="w-full text-left" @click="openGroupDetail(group)">
-                <div class="flex items-start gap-3">
-                  <span class="mt-1 text-sm">⭐</span>
-                  <div class="min-w-0 flex-1">
-                    <strong class="block truncate text-base font-bold text-white">
-                      {{ group.products?.name || '-' }} / {{ group.product_options?.name || '-' }}
-                    </strong>
-                    <span class="mt-1 block text-sm text-white/65">
-                      {{ group.total_quantity }}박스 · 내 결제 {{ group.host_quantity }}박스 · 링크
-                      {{ group.share_slot_count }}개
-                    </span>
-                    <span class="mt-1 block text-xs text-white/45">{{
-                      formatDateTime(group.created_at)
-                    }}</span>
-                  </div>
-                  <div class="ml-2 flex flex-col items-end gap-2">
-                    <span
-                      class="rounded-md bg-blue-500 px-2 py-1 text-[10px] font-black text-white"
-                    >
-                      {{ group.status }}
-                    </span>
-                    <span class="text-white/60">›</span>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                class="mt-3 flex items-center gap-1 text-xs font-semibold text-rose-300 hover:text-rose-400"
-                :disabled="deletingGroupBuyId === group.id"
-                @click="deleteGroupBuy(group.id)"
-              >
-                <Trash2 size="16" />
-
-                {{ deletingGroupBuyId === group.id ? '삭제 중...' : '삭제' }}
-              </button>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <div v-if="isGroupBuySheetOpen" class="gm-overlay" @click.self="closeGroupBuySheet">
-        <div class="gm-overlay-panel">
-          <div class="gm-overlay-header">
-            <h2 class="gm-overlay-title">{{ sheetTitle }}</h2>
-            <button type="button" class="gm-overlay-close" @click="closeGroupBuySheet">×</button>
-          </div>
-
-          <div class="gm-overlay-body">
-            <div v-if="groupBuyStep === 1">
-              <div class="gm-card gm-card-soft gm-mb-16">
-                <div class="flex items-center justify-between gap-3">
-                  <strong class="gm-qty-title">상품 옵션 선택</strong>
-                  <span class="text-sm font-bold text-rose-500">필수 선택</span>
-                </div>
-              </div>
-
-              <div class="gm-option-list space-y-2">
-                <label
-                  v-for="option in options"
-                  :key="option.id"
-                  class="gm-option-card flex items-center justify-between gap-3 p-4"
-                >
-                  <span class="flex min-w-0 items-center gap-3">
-                    <input
-                      v-model="selectedOptionId"
-                      type="radio"
-                      :value="option.id"
-                      class="h-5 w-5"
-                    />
-                    <span class="truncate text-base font-semibold text-gray-900">
-                      {{ product?.name || '고마마정품' }} {{ option.name }}
-                    </span>
-                  </span>
-
-                  <span class="shrink-0 text-sm font-extrabold text-gray-700">
-                    {{ formatCurrency(Math.max(option.price - totalDiscountPerItem, 0)) }}
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            <div v-else-if="groupBuyStep === 2">
-              <div class="gm-notice gm-notice-info gm-mb-16">
-                <span class="gm-notice-icon">2</span>
-                <div class="gm-notice-content">
-                  <strong class="gm-notice-title">총 몇 박스로 공동구매할까요?</strong>
-                  <p class="gm-notice-text">친구들과 함께 주문할 전체 박스 수를 선택해 주세요.</p>
-                </div>
-              </div>
-
-              <div class="gm-card gm-card-soft">
-                <div class="gm-qty-row">
-                  <div class="gm-qty-info">
-                    <span class="gm-qty-title">총 공동구매 수량</span>
-                    <span class="gm-qty-desc">최소 2박스부터 시작할 수 있어요.</span>
-                  </div>
-
-                  <div class="gm-qty">
-                    <button
-                      type="button"
-                      class="gm-qty-button"
-                      :disabled="totalQuantity <= 2"
-                      @click="decreaseTotalQuantity"
-                    >
-                      -
-                    </button>
-                    <span class="gm-qty-value">{{ totalQuantity }}</span>
-                    <button type="button" class="gm-qty-button" @click="increaseTotalQuantity">
-                      +
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="gm-notice gm-notice-success gm-mt-16">
-                <span class="gm-notice-icon">✓</span>
-                <div class="gm-notice-content">
-                  <strong class="gm-notice-title">현재 설정</strong>
-                  <p class="gm-notice-text">총 {{ totalQuantity }}박스로 공동구매를 진행합니다.</p>
-                </div>
-              </div>
-            </div>
-
-            <div v-else-if="groupBuyStep === 3">
-              <div class="gm-notice gm-notice-info gm-mb-16">
-                <span class="gm-notice-icon">3</span>
-                <div class="gm-notice-content">
-                  <strong class="gm-notice-title">나는 몇 박스를 결제할까요?</strong>
-                  <p class="gm-notice-text">나머지 수량은 친구에게 보낼 링크로 자동 생성돼요.</p>
-                </div>
-              </div>
-
-              <div class="gm-card gm-card-soft">
-                <div class="gm-qty-row">
-                  <div class="gm-qty-info">
-                    <span class="gm-qty-title">내 결제 수량</span>
-                    <span class="gm-qty-desc">내가 직접 결제할 박스 수입니다.</span>
-                  </div>
-
-                  <div class="gm-qty">
-                    <button
-                      type="button"
-                      class="gm-qty-button"
-                      :disabled="hostQuantity <= 1"
-                      @click="decreaseHostQuantity"
-                    >
-                      -
-                    </button>
-                    <span class="gm-qty-value">{{ hostQuantity }}</span>
-                    <button
-                      type="button"
-                      class="gm-qty-button"
-                      :disabled="hostQuantity >= totalQuantity"
-                      @click="increaseHostQuantity"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="gm-notice gm-notice-success gm-mt-16">
-                <span class="gm-notice-icon">✓</span>
-                <div class="gm-notice-content">
-                  <strong class="gm-notice-title">초대 링크 자동 생성</strong>
-                  <p class="gm-notice-text">
-                    내가 {{ hostQuantity }}박스를 결제하고, 친구에게 보낼 링크
-                    {{ autoShareLinkCount }}개가 생성됩니다.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div v-else-if="groupBuyStep === 4">
-              <div class="gm-notice gm-notice-success gm-mb-16">
-                <span class="gm-notice-icon">4</span>
-                <div class="gm-notice-content">
-                  <strong class="gm-notice-title">공동구매 내용을 확인해 주세요</strong>
-                  <p class="gm-notice-text">
-                    아래 내용으로 공동구매를 만들고 초대 링크를 생성합니다.
-                  </p>
-                </div>
-              </div>
-
-              <div class="gm-card gm-card-soft">
-                <div class="gm-summary">
-                  <div class="gm-summary-row">
-                    <span class="gm-summary-label">상품</span>
-                    <span class="gm-summary-value">{{ product?.name || '고마마정품' }}</span>
-                  </div>
-                  <div class="gm-summary-row">
-                    <span class="gm-summary-label">옵션</span>
-                    <span class="gm-summary-value">{{ selectedOption?.name || '-' }}</span>
-                  </div>
-                  <div class="gm-summary-row">
-                    <span class="gm-summary-label">총 수량</span>
-                    <span class="gm-summary-value">{{ totalQuantity }}박스</span>
-                  </div>
-                  <div class="gm-summary-row">
-                    <span class="gm-summary-label">내 결제 수량</span>
-                    <span class="gm-summary-value">{{ hostQuantity }}박스</span>
-                  </div>
-                  <div class="gm-summary-row">
-                    <span class="gm-summary-label">공유 링크</span>
-                    <span class="gm-summary-value">{{ autoShareLinkCount }}개</span>
-                  </div>
-
-                  <div class="gm-summary-divider"></div>
-
-                  <div class="gm-summary-row">
-                    <span class="gm-summary-label">기본 단가</span>
-                    <span class="gm-summary-value">{{ formatCurrency(baseUnitPrice) }}</span>
-                  </div>
-                  <div class="gm-summary-row">
-                    <span class="gm-summary-label">개당 할인</span>
-                    <span class="gm-summary-value gm-summary-discount">
-                      - {{ formatCurrency(totalDiscountPerItem) }}
-                    </span>
-                  </div>
-                  <div class="gm-summary-row">
-                    <span class="gm-summary-label">공동구매 총액</span>
-                    <span class="gm-summary-value">{{ formatCurrency(paymentTotal) }}</span>
-                  </div>
-
-                  <div class="gm-summary-divider"></div>
-
-                  <div class="gm-summary-row gm-summary-total">
-                    <span class="gm-summary-label">내 예상 결제금액</span>
-                    <span class="gm-summary-value">{{ formatCurrency(hostPaymentTotal) }}</span>
-                  </div>
-
-                  <span class="gm-summary-small">
-                    친구들은 생성된 링크에서 각자 주소 입력과 결제를 진행합니다.
-                  </span>
-                </div>
-              </div>
-
-              <div v-if="groupBuyError" class="gm-notice gm-notice-danger gm-mt-16">
-                <span class="gm-notice-icon">!</span>
-                <div class="gm-notice-content">
-                  <strong class="gm-notice-title">생성 실패</strong>
-                  <p class="gm-notice-text">{{ groupBuyError }}</p>
-                </div>
-              </div>
-            </div>
-
-            <div v-else-if="groupBuyStep === 5">
-              <div class="gm-complete">
-                <div class="gm-complete-icon">✓</div>
-                <h2 class="gm-complete-title">
-                  공동구매가<br />
-                  만들어졌어요
-                </h2>
-                <p class="gm-complete-text">
-                  이제 내 공동구매에서 친구에게<br />
-                  초대 링크를 공유하면 됩니다.
-                </p>
-              </div>
-
-              <div v-if="groupBuySuccess" class="gm-notice gm-notice-success gm-mb-16">
-                <span class="gm-notice-icon">✓</span>
-                <div class="gm-notice-content">
-                  <strong class="gm-notice-title">생성 완료</strong>
-                  <p class="gm-notice-text">{{ groupBuySuccess }}</p>
-                </div>
-              </div>
-
-              <div class="gm-notice gm-notice-info">
-                <span class="gm-notice-icon">i</span>
-                <div class="gm-notice-content">
-                  <strong class="gm-notice-title">링크 공유는 내 공동구매에서</strong>
-                  <p class="gm-notice-text">
-                    오버레이를 닫고 [링크 공유] 버튼을 눌러 보내면 됩니다.
-                  </p>
-                </div>
-              </div>
+          <div v-if="groupBuySuccess" class="gm-notice gm-notice-success gm-mb-16">
+            <span class="gm-notice-icon">✓</span>
+            <div class="gm-notice-content">
+              <strong class="gm-notice-title">생성 완료</strong>
+              <p class="gm-notice-text">{{ groupBuySuccess }}</p>
             </div>
           </div>
 
-          <div class="gm-overlay-footer">
-            <div class="gm-bottom-action-row">
-              <button
-                v-if="groupBuyStep > 1 && groupBuyStep < 5"
-                type="button"
-                class="gm-button gm-button-lg gm-button-pill gm-button-outline"
-                @click="prevGroupBuyStep"
-              >
-                이전
-              </button>
-
-              <button
-                type="button"
-                class="gm-button gm-button-lg gm-button-pill gm-button-primary"
-                style="flex: 1"
-                :disabled="(groupBuyStep === 1 && !selectedOptionId) || isCreatingGroupBuy"
-                @click="
-                  groupBuyStep === 4
-                    ? createGroupBuy()
-                    : groupBuyStep === 5
-                      ? closeGroupBuySheet()
-                      : nextGroupBuyStep()
-                "
-              >
-                {{
-                  groupBuyStep === 4
-                    ? isCreatingGroupBuy
-                      ? '공동구매 생성 중...'
-                      : '공동구매 만들기'
-                    : groupBuyStep === 5
-                      ? '내 공동구매 보기'
-                      : '다음'
-                }}
-              </button>
+          <div class="gm-notice gm-notice-info">
+            <span class="gm-notice-icon">i</span>
+            <div class="gm-notice-content">
+              <strong class="gm-notice-title">링크 공유는 내 공동구매에서</strong>
+              <p class="gm-notice-text">오버레이를 닫고 [링크 공유] 버튼을 눌러 보내면 됩니다.</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div v-if="selectedGroup" class="gm-overlay" @click.self="closeGroupDetail">
-        <div class="gm-overlay-panel">
-          <div class="gm-overlay-header">
-            <h2 class="gm-overlay-title">링크 공유</h2>
-            <button type="button" class="gm-overlay-close" @click="closeGroupDetail">×</button>
+      <div class="gm-overlay-footer">
+        <div class="gm-bottom-action-row">
+          <button
+            v-if="groupBuyStep > 1 && groupBuyStep < 5"
+            type="button"
+            class="gm-button gm-button-lg gm-button-pill gm-button-outline"
+            @click="prevGroupBuyStep"
+          >
+            이전
+          </button>
+
+          <button
+            type="button"
+            class="gm-button gm-button-lg gm-button-pill gm-button-primary"
+            style="flex: 1"
+            :disabled="(groupBuyStep === 1 && !selectedOptionId) || isCreatingGroupBuy"
+            @click="
+              groupBuyStep === 4
+                ? createGroupBuy()
+                : groupBuyStep === 5
+                  ? closeGroupBuySheet()
+                  : nextGroupBuyStep()
+            "
+          >
+            {{
+              groupBuyStep === 4
+                ? isCreatingGroupBuy
+                  ? '공동구매 생성 중...'
+                  : '공동구매 만들기'
+                : groupBuyStep === 5
+                  ? '내 공동구매 보기'
+                  : '다음'
+            }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="selectedGroup" class="gm-overlay" @click.self="closeGroupDetail">
+    <div class="gm-overlay-panel">
+      <div class="gm-overlay-header">
+        <h2 class="gm-overlay-title">링크 공유</h2>
+        <button type="button" class="gm-overlay-close" @click="closeGroupDetail">×</button>
+      </div>
+
+      <div class="gm-overlay-body">
+        <div class="gm-notice gm-notice-info gm-mb-16">
+          <span class="gm-notice-icon">i</span>
+          <div class="gm-notice-content">
+            <strong class="gm-notice-title">친구에게 초대 링크를 보내세요</strong>
+            <p class="gm-notice-text">참여자는 받은 링크에서 주소 입력과 결제를 진행합니다.</p>
           </div>
+        </div>
 
-          <div class="gm-overlay-body">
-            <div class="gm-notice gm-notice-info gm-mb-16">
-              <span class="gm-notice-icon">i</span>
-              <div class="gm-notice-content">
-                <strong class="gm-notice-title">친구에게 초대 링크를 보내세요</strong>
-                <p class="gm-notice-text">참여자는 받은 링크에서 주소 입력과 결제를 진행합니다.</p>
+        <div class="gm-card gm-card-soft gm-mb-16">
+          <div class="gm-summary">
+            <div class="gm-summary-row">
+              <span class="gm-summary-label">상품</span>
+              <span class="gm-summary-value">{{ selectedGroup.products?.name || '-' }}</span>
+            </div>
+            <div class="gm-summary-row">
+              <span class="gm-summary-label">옵션</span>
+              <span class="gm-summary-value">{{ selectedGroup.product_options?.name || '-' }}</span>
+            </div>
+            <div class="gm-summary-row">
+              <span class="gm-summary-label">총 수량</span>
+              <span class="gm-summary-value">{{ selectedGroup.total_quantity }}박스</span>
+            </div>
+            <div class="gm-summary-row">
+              <span class="gm-summary-label">초대 링크</span>
+              <span class="gm-summary-value">{{ selectedGroup.share_slot_count }}개</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="gm-history-list">
+          <article
+            v-for="member in selectedGroup.group_buy_members || []"
+            :key="member.id"
+            class="gm-history-card"
+          >
+            <div class="gm-history-head">
+              <div>
+                <strong class="gm-history-title">
+                  #{{ member.slot_no }} {{ member.is_host ? '주최자' : '참여자' }}
+                </strong>
+                <span class="gm-history-date">
+                  결제: {{ member.payment_status }} · 주소:
+                  {{ member.receiver && member.address ? '완료' : '미입력' }}
+                </span>
               </div>
+
+              <span class="gm-history-status">
+                {{ member.payment_status === 'paid' ? '결제완료' : '대기' }}
+              </span>
             </div>
 
-            <div class="gm-card gm-card-soft gm-mb-16">
-              <div class="gm-summary">
-                <div class="gm-summary-row">
-                  <span class="gm-summary-label">상품</span>
-                  <span class="gm-summary-value">{{ selectedGroup.products?.name || '-' }}</span>
-                </div>
-                <div class="gm-summary-row">
-                  <span class="gm-summary-label">옵션</span>
-                  <span class="gm-summary-value">{{
-                    selectedGroup.product_options?.name || '-'
-                  }}</span>
-                </div>
-                <div class="gm-summary-row">
-                  <span class="gm-summary-label">총 수량</span>
-                  <span class="gm-summary-value">{{ selectedGroup.total_quantity }}박스</span>
-                </div>
-                <div class="gm-summary-row">
-                  <span class="gm-summary-label">초대 링크</span>
-                  <span class="gm-summary-value">{{ selectedGroup.share_slot_count }}개</span>
-                </div>
-              </div>
-            </div>
+            <div class="mt-3">
+              <template v-if="member.is_host">
+                <button
+                  v-if="member.payment_status !== 'paid'"
+                  type="button"
+                  class="gm-button gm-button-full gm-button-md gm-button-pill gm-button-primary"
+                  :disabled="payingHostMemberId === member.id"
+                  @click="payHostMember(selectedGroup, member)"
+                >
+                  {{ payingHostMemberId === member.id ? '결제 준비 중...' : '주최자 결제하기' }}
+                </button>
 
-            <div class="gm-history-list">
-              <article
-                v-for="member in selectedGroup.group_buy_members || []"
-                :key="member.id"
-                class="gm-history-card"
-              >
-                <div class="gm-history-head">
-                  <div>
-                    <strong class="gm-history-title">
-                      #{{ member.slot_no }} {{ member.is_host ? '주최자' : '참여자' }}
-                    </strong>
-                    <span class="gm-history-date">
-                      결제: {{ member.payment_status }} · 주소:
-                      {{ member.receiver && member.address ? '완료' : '미입력' }}
+                <div v-else class="gm-notice gm-notice-success">
+                  <span class="gm-notice-icon">✓</span>
+                  <div class="gm-notice-content">
+                    <strong class="gm-notice-title">주최자 결제 완료</strong>
+                    <p class="gm-notice-text">주최자 결제가 완료되었습니다.</p>
+                  </div>
+                </div>
+              </template>
+
+              <template v-else-if="member.invite_token">
+                <div class="rounded-3xl border border-sky-200 bg-sky-50/80 p-4">
+                  <div class="flex items-center justify-between gap-2">
+                    <strong class="text-sm font-extrabold text-slate-800"
+                      >초대 링크 준비 완료</strong
+                    >
+                    <span
+                      class="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-sky-600"
+                    >
+                      참여자 #{{ member.slot_no }}
                     </span>
                   </div>
 
-                  <span class="gm-history-status">
-                    {{ member.payment_status === 'paid' ? '결제완료' : '대기' }}
-                  </span>
+                  <p class="mt-2 text-xs font-semibold leading-relaxed text-slate-500">
+                    아래 버튼으로 공유하면 상대방이 주소 입력과 결제를 바로 진행할 수 있어요.
+                  </p>
+
+                  <button
+                    type="button"
+                    class="mt-3 flex w-full items-center justify-between rounded-2xl border border-sky-200 bg-white px-4 py-3 text-left"
+                    @click="shareOneInviteLink(member.invite_token)"
+                  >
+                    <span class="text-sm font-extrabold text-sky-600">친구에게 공유하기</span>
+                    <span class="text-xl leading-none text-sky-500">›</span>
+                  </button>
                 </div>
+              </template>
 
-                <div class="mt-3">
-                  <template v-if="member.is_host">
-                    <button
-                      v-if="member.payment_status !== 'paid'"
-                      type="button"
-                      class="gm-button gm-button-full gm-button-md gm-button-pill gm-button-primary"
-                      :disabled="payingHostMemberId === member.id"
-                      @click="payHostMember(selectedGroup, member)"
-                    >
-                      {{ payingHostMemberId === member.id ? '결제 준비 중...' : '주최자 결제하기' }}
-                    </button>
-
-                    <div v-else class="gm-notice gm-notice-success">
-                      <span class="gm-notice-icon">✓</span>
-                      <div class="gm-notice-content">
-                        <strong class="gm-notice-title">주최자 결제 완료</strong>
-                        <p class="gm-notice-text">주최자 결제가 완료되었습니다.</p>
-                      </div>
-                    </div>
-                  </template>
-
-                  <template v-else-if="member.invite_token">
-                    <div class="rounded-3xl border border-sky-200 bg-sky-50/80 p-4">
-                      <div class="flex items-center justify-between gap-2">
-                        <strong class="text-sm font-extrabold text-slate-800"
-                          >초대 링크 준비 완료</strong
-                        >
-                        <span
-                          class="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-sky-600"
-                        >
-                          참여자 #{{ member.slot_no }}
-                        </span>
-                      </div>
-
-                      <p class="mt-2 text-xs font-semibold leading-relaxed text-slate-500">
-                        아래 버튼으로 공유하면 상대방이 주소 입력과 결제를 바로 진행할 수 있어요.
-                      </p>
-
-                      <button
-                        type="button"
-                        class="mt-3 flex w-full items-center justify-between rounded-2xl border border-sky-200 bg-white px-4 py-3 text-left"
-                        @click="shareOneInviteLink(member.invite_token)"
-                      >
-                        <span class="text-sm font-extrabold text-sky-600">친구에게 공유하기</span>
-                        <span class="text-xl leading-none text-sky-500">›</span>
-                      </button>
-                    </div>
-                  </template>
-
-                  <template v-else>
-                    <div class="gm-notice gm-notice-warning">
-                      <span class="gm-notice-icon">!</span>
-                      <div class="gm-notice-content">
-                        <strong class="gm-notice-title">링크 없음</strong>
-                        <p class="gm-notice-text">이 참여자 슬롯에는 초대 링크가 없습니다.</p>
-                      </div>
-                    </div>
-                  </template>
+              <template v-else>
+                <div class="gm-notice gm-notice-warning">
+                  <span class="gm-notice-icon">!</span>
+                  <div class="gm-notice-content">
+                    <strong class="gm-notice-title">링크 없음</strong>
+                    <p class="gm-notice-text">이 참여자 슬롯에는 초대 링크가 없습니다.</p>
+                  </div>
                 </div>
-              </article>
+              </template>
             </div>
-          </div>
-
-          <div class="gm-overlay-footer">
-            <button
-              type="button"
-              class="gm-button gm-button-full gm-button-lg gm-button-pill gm-button-outline"
-              @click="closeGroupDetail"
-            >
-              닫기
-            </button>
-          </div>
+          </article>
         </div>
+      </div>
+
+      <div class="gm-overlay-footer">
+        <button
+          type="button"
+          class="gm-button gm-button-full gm-button-lg gm-button-pill gm-button-outline"
+          @click="closeGroupDetail"
+        >
+          닫기
+        </button>
       </div>
     </div>
   </div>

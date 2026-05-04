@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&family=Gowun+Batang&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Dongle&family=East+Sea+Dokdo&family=Gowun+Batang&display=swap');
 @import "tailwindcss";
 
 * {
@@ -12,6 +12,8 @@ body,
 }
 
 body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Gowun Batang', 'Apple SD Gothic Neo', sans-serif;
   margin: 0;
 }
 
