@@ -551,56 +551,86 @@ onMounted(async () => {
   </section>
 
   <section class="gm-section">
-    <div
-      class="overflow-hidden rounded-3xl border border-[#20242e] bg-[#0b0f15] text-white shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
-    >
-      <div class="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
+    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <!-- 헤더 -->
+      <div class="flex items-center justify-between px-5 py-4 border-b">
         <div>
-          <h2 class="text-lg font-bold tracking-tight">내 공동구매</h2>
-          <p class="mt-1 text-sm text-white/60">링크 공유와 결제 상태를 확인하세요.</p>
+          <h2 class="text-lg font-bold text-gray-900">내 공동구매</h2>
+          <p class="text-sm text-gray-400">링크 공유와 결제 상태를 확인하세요</p>
         </div>
 
-        <button
-          type="button"
-          class="shrink-0 rounded-full border border-white/20 px-3 py-1 text-xs font-bold text-white/80 transition hover:bg-white/10"
-          @click="loadMyGroupBuys"
-        >
-          <RefreshCcw size="16" />
+        <button type="button" class="p-2 rounded-full hover:bg-gray-100" @click="loadMyGroupBuys">
+          <RefreshCcw size="18" class="text-gray-500" />
         </button>
       </div>
 
-      <div v-if="isLoadingMyGroupBuys" class="px-5 py-7 text-center text-sm text-white/70">
-        내 공동구매 목록을 확인하고 있어요.
+      <!-- 로딩 -->
+      <div v-if="isLoadingMyGroupBuys" class="px-5 py-8 text-center text-sm text-gray-400">
+        내 공동구매 목록을 불러오는 중...
       </div>
 
-      <div v-else-if="!myGroupBuys.length" class="px-5 py-7 text-center">
-        <h4 class="text-base font-semibold text-white">아직 공동구매가 없어요</h4>
-        <p class="mt-1 text-sm text-white/60">공동구매를 만들면 이곳에 표시됩니다.</p>
+      <!-- 없음 -->
+      <div v-else-if="!myGroupBuys.length" class="px-5 py-8 text-center">
+        <h4 class="text-base font-semibold text-gray-800">공동구매가 없어요</h4>
+        <p class="text-sm text-gray-400 mt-1">지금 바로 시작해보세요</p>
       </div>
 
-      <article v-for="group in myGroupBuys" :key="group.id" class="px-5 py-4">
-        {{ formatDateTime(group.created_at) }} {{ group.status }}
-        <button type="button" class="w-full text-left" @click="openGroupDetail(group)">
-          <div class="min-w-0 flex-1">
-            {{ group.products?.name || '-' }}<br />
-            {{ group.product_options?.name || '-' }}
-            총 주문수 {{ group.share_slot_count }}박스<br />
-            내 결제 {{ group.host_quantity }}박스<br />
-            공동구매자 {{ group.total_quantity }} 박스
+      <!-- 리스트 -->
+      <div v-else>
+        <article
+          v-for="group in myGroupBuys"
+          :key="group.id"
+          class="px-5 py-4 border-b last:border-b-0"
+        >
+          <!-- 상단 -->
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-semibold text-gray-500">
+              {{ group.status === 'collecting' ? '모집중' : '완료' }}
+            </span>
+
+            <span class="text-xs text-gray-400">
+              {{ formatDateTime(group.created_at) }}
+            </span>
           </div>
-        </button>
 
-        <button
-          type="button"
-          class="mt-3 flex items-center gap-1 text-xs font-semibold text-rose-300 hover:text-rose-400"
-          :disabled="deletingGroupBuyId === group.id"
-          @click="deleteGroupBuy(group.id)"
-        >
-          <Trash2 size="16" />
+          <!-- 클릭 영역 -->
+          <button type="button" class="w-full text-left" @click="openGroupDetail(group)">
+            <div class="font-semibold text-gray-900">
+              {{ group.products?.name || '-' }}
+            </div>
 
-          {{ deletingGroupBuyId === group.id ? '삭제 중...' : '삭제' }}
-        </button>
-      </article>
+            <div class="text-sm text-gray-500 mb-2">
+              {{ group.product_options?.name || '-' }}
+            </div>
+
+            <!-- 핵심 정보 -->
+            <div class="flex gap-4 text-sm text-gray-600">
+              <span>총 {{ group.total_quantity }}박스</span>
+              <span>내 {{ group.host_quantity }}박스</span>
+              <span>링크 {{ group.share_slot_count }}개</span>
+            </div>
+          </button>
+
+          <!-- 하단 버튼 -->
+          <div class="flex justify-between items-center mt-3">
+            <!-- 공유 버튼 -->
+            <button class="text-sm font-semibold text-blue-600" @click="openGroupDetail(group)">
+              링크 공유
+            </button>
+
+            <!-- 삭제 -->
+            <button
+              type="button"
+              class="flex items-center gap-1 text-sm text-red-500 hover:text-red-600"
+              :disabled="deletingGroupBuyId === group.id"
+              @click="deleteGroupBuy(group.id)"
+            >
+              <Trash2 size="14" />
+              {{ deletingGroupBuyId === group.id ? '삭제 중...' : '삭제' }}
+            </button>
+          </div>
+        </article>
+      </div>
     </div>
   </section>
 
