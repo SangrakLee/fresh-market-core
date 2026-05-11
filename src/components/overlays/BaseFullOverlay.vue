@@ -1,7 +1,7 @@
 <template>
   <!-- 전체 화면 덮는 오버레이 -->
   <transition name="slide">
-    <div v-if="modelValue" class="fixed inset-0 z-50 bg-black">
+    <div v-if="modelValue" class="fixed inset-0 z-[80] bg-black">
       <!-- 상단 헤더 -->
       <div class="flex items-center h-14 px-4 border-b border-white/10">
         <!-- 뒤로가기 -->

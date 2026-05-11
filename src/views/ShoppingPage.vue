@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import BaseFullOverlay from '@/components/overlays/BaseFullOverlay.vue'
 import CheckoutOverlayContent from '@/features/checkout/components/CheckoutOverlayContent.vue'
+import GiftCheckoutOverlayContent from '@/features/checkout/components/GiftCheckoutOverlayContent.vue'
 import AddressSearchOverlayContent from '@/features/address/components/AddressSearchOverlayContent.vue'
 const detailImageModules = import.meta.glob('../assets/images/detail-img/*.{jpg,jpeg,png,webp}', {
   eager: true,
@@ -57,6 +58,7 @@ const customerName = ref('고객')
 const productName = ref('참외')
 const isMember = computed(() => memberType.value !== '비회원')
 const isCheckoutOpen = ref(false)
+const isGiftCheckoutOpen = ref(false)
 const checkoutOrder = ref(null)
 const selectedZonecode = ref('')
 const selectedBaseAddress = ref('')
@@ -231,10 +233,10 @@ onMounted(async () => {
   }
 })
 
-const openCheckoutOverlay = () => {
+const buildCheckoutOrder = () => {
   if (!selectedWeights.value.length) {
     alert('옵션을 1개 이상 선택해 주세요.')
-    return
+    return false
   }
 
   const selectedProducts = products.value.filter((product) =>
@@ -268,7 +270,19 @@ const openCheckoutOverlay = () => {
 
   selectedZonecode.value = ''
   selectedBaseAddress.value = ''
-  isCheckoutOpen.value = true
+  return true
+}
+
+const openCheckoutOverlay = () => {
+  if (buildCheckoutOrder()) {
+    isCheckoutOpen.value = true
+  }
+}
+
+const openGiftCheckoutOverlay = () => {
+  if (buildCheckoutOrder()) {
+    isGiftCheckoutOpen.value = true
+  }
 }
 
 function handleSelectAddress(addressItem) {
@@ -346,7 +360,7 @@ async function handleConfirmOrder(checkoutPayload) {
   }
 
   isCheckoutOpen.value = false
-
+  isGiftCheckoutOpen.value = false
   await openTossPayment({
     orderCode,
     amount: checkoutPayload.total_amount,
@@ -618,14 +632,24 @@ async function handleConfirmOrder(checkoutPayload) {
                 <strong class="gm-bottom-action-amount"> {{ formatPrice(totalPrice) }}원 </strong>
               </div>
 
-              <button
-                type="button"
-                class="gm-button gm-button-lg gm-button-pill gm-button-primary"
-                :disabled="!selectedWeights.length"
-                @click="openCheckoutOverlay"
-              >
-                주문하기
-              </button>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  class="gm-button gm-button-lg gm-button-pill border border-[#22d3c5] bg-white text-black"
+                  :disabled="!selectedWeights.length"
+                  @click="openGiftCheckoutOverlay"
+                >
+                  선물하기
+                </button>
+                <button
+                  type="button"
+                  class="gm-button gm-button-lg gm-button-pill gm-button-primary"
+                  :disabled="!selectedWeights.length"
+                  @click="openCheckoutOverlay"
+                >
+                  주문하기
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -638,6 +662,15 @@ async function handleConfirmOrder(checkoutPayload) {
           :zonecode="selectedZonecode"
           :base-address="selectedBaseAddress"
           @open-address-search="isAddressSearchOpen = true"
+          @confirm-order="handleConfirmOrder"
+        />
+      </BaseFullOverlay>
+
+      <BaseFullOverlay v-model="isGiftCheckoutOpen">
+        <GiftCheckoutOverlayContent
+          v-if="checkoutOrder"
+          :order="checkoutOrder"
+          :is-submitting="isSubmittingOrder"
           @confirm-order="handleConfirmOrder"
         />
       </BaseFullOverlay>
